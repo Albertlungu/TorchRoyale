@@ -43,7 +43,7 @@ Table 3.0.1: Project Breakdown
 | Setup | Create GitHub | 1 |
 |  |  |  |
 |  |  |  |
-| Training model |  |  |
+| Training model | Train model on chosen dataset |  |
 | Creating Desktop Application |  |  |
 |  |  |  |
 |  |  |  |
