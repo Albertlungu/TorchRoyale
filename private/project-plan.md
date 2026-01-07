@@ -83,8 +83,11 @@ For each risk describe preventative measures, corrective actions, and the risk l
 
 # 6.0 Team Policies
 
-**For Teams**  
-In order to keep amicable relations within the team, some team policies must be set.
+Our team is able to work on the project during and outside the classroom.
+
+Conversations during work time are expected to be on-topic for the most part. We are human and off-topic conversations are expected (and sometimes encouraged).
+
+If a member is unable to attend, they are expected to convey with other members atleast 12 hours prior and work can be completed whenever before the end of the sprint.
 
 # 6.1 Time Commitment
 
