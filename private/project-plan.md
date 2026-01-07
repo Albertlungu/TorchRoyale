@@ -41,22 +41,22 @@ Table 3.0.1: Project Breakdown
 | Subproject | Tasks | Difficulty Level |
 | :---- | :---- | :---- |
 | Setup | Create GitHub repository | 1 |
-| Setup | Set up project documentation | 1 |
+|  | Set up project documentation | 1 |
 | Model Integration | Set up Roboflow API integration | 3 |
-| Model Integration | Train/fine-tune model on chosen dataset | 5 |
-| Model Integration | Test model accuracy and detection performance | 3 |
-| Desktop Application | Create Tkinter game board UI with grid overlay | 5 |
-| Desktop Application | Implement real-time screenshot/screen capture | 5 |
-| Desktop Application | Build card recommendation algorithm | 8 |
-| Desktop Application | Integrate model with UI for live recommendations | 5 |
+|  | Train/fine-tune model on chosen dataset | 5 |
+|  | Test model accuracy and detection performance | 3 |
+| Desktop Application | Create Tkinter game board UI with grid overlay | 3 |
+| | Implement real-time screenshot/screen capture | 5 |
+| | Build card recommendation algorithm | 8 |
+| | Integrate model with UI for live recommendations | 5 |
 | Testing & Debugging | Test end-to-end application flow | 3 |
-| Testing & Debugging | Debug and optimize performance | 5 |
+| | Debug and optimize performance | 5 |
 | Final Presentation | Complete presentation slides | 5 |
-| Final Presentation | Practice presentation | 1 |
+| | Practice presentation | 1 |
 
 # 4.0 Resources
 
-*Note: Remember to always include a transition paragraph between sections. So if all of your info is in 4.1 and 4.2, you should make sure there are a couple of sentences in 4.0 that provide an introduction to the purpose of the section and what the subsections will contain.* 
+This section of the project plan will cover the team structure, the online resources used, tools and frameworks, and any other information about the development environment.
 
 ## 4.1 Team Structure
 
@@ -68,28 +68,31 @@ Team coordination occurs through Discord for asynchronous communication and in-p
 
 ## 4.2 Software
 
-The TorchRoyale project will utilize the following software tools and platforms:
+The TorchRoyale project will use the following software tools and platforms:
 
-**Programming Language**: Python 3.x
+**Programming Language**: Python 3.12
 
 **Desktop Application Framework**: Tkinter (Python standard GUI library)
 
 **Machine Learning & Model**:
-- Roboflow API for model inference and card detection
-- PyTorch or TensorFlow for potential custom model training and fine-tuning
-- Pre-trained model from Roboflow: [https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2](https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2)
-- Dataset: [https://universe.roboflow.com/clashroyale/clash-royale-of3d3](https://universe.roboflow.com/clashroyale/clash-royale-of3d3)
+- Roboflow API for image inference and card detection
+- PyTorch for custom model training and fine-tuning
+- Pre-trained image detection model from Roboflow: [https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2](https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2)
+- Clash Royale assets dataset: [https://universe.roboflow.com/clashroyale/clash-royale-of3d3](https://universe.roboflow.com/clashroyale/clash-royale-of3d3)
 
 **Development Environment**:
-- IDE: VS Code or PyCharm
+- IDE: VS Code
 - Version Control: Git
 - Repository Hosting: GitHub
+- Preferred terminal lanuage: Bash
 
 **Project Management**:
 - GitHub Issues and Projects for sprint backlog and task tracking
 - Discord for team communication
+- Trello Konbon board for planning specific tasks
 
 **Additional Libraries** (as needed):
+- PyTorch 2.9.1 (Most stable version)
 - PIL/Pillow for image processing
 - NumPy for numerical operations
 - Requests for API calls
@@ -114,15 +117,17 @@ This section identifies three major risks that could impact the TorchRoyale proj
 **Description**: The Roboflow detection model may not accurately identify Clash Royale cards or game state in all scenarios, leading to incorrect or missing recommendations.
 
 **Probability**: Medium
+
 **Severity**: Major
+
 **Risk Level**: High
 
-**Preventative Measures**:
+**Preventing it**:
 - Thoroughly test the Roboflow model with diverse game scenarios before integration
 - Validate detection accuracy across different card types, game states, and lighting conditions
 - Establish minimum accuracy thresholds (e.g., 90% detection rate) before proceeding to algorithm development
 
-**Corrective Actions**:
+**Fixing it**:
 - If accuracy is insufficient, fine-tune the model using additional training data from the Clash Royale dataset
 - Implement confidence thresholds to filter out low-confidence detections
 - Add manual override capability for users to correct misidentified cards
@@ -133,15 +138,17 @@ This section identifies three major risks that could impact the TorchRoyale proj
 **Description**: Supercell may update Clash Royale's user interface, visual assets, or game mechanics, which could invalidate the detection model and break the application's card recognition capabilities.
 
 **Probability**: Low
+
 **Severity**: Moderate
+
 **Risk Level**: Medium
 
-**Preventative Measures**:
+**Preventing it**:
 - Monitor Clash Royale's official channels and community forums for announced updates
 - Design the detection layer with abstraction to make model swapping easier
 - Document the specific game version and visual assets the model was trained on
 
-**Corrective Actions**:
+**Fixing it**:
 - If game updates break detection, immediately assess what visual elements changed
 - Retrain or fine-tune the model using screenshots from the updated game version
 - Maintain a fallback version of the application that works with the previous game version during retraining
@@ -152,15 +159,17 @@ This section identifies three major risks that could impact the TorchRoyale proj
 **Description**: The upstream Roboflow model or detection repository may be updated, modified, or deprecated, potentially breaking compatibility with the TorchRoyale application.
 
 **Probability**: Low
+
 **Severity**: Minor
+
 **Risk Level**: Low
 
-**Preventative Measures**:
+**Preventing it**:
 - Fork and version-lock the detection model to maintain a stable copy under team control
 - Document the exact model version, API endpoints, and dependencies being used
 - Store model weights locally if permitted by Roboflow's licensing terms
 
-**Corrective Actions**:
+**Fixing it**:
 - If upstream changes occur, continue using the forked/locked version without immediate changes
 - Evaluate whether upstream updates provide benefits worth migrating to
 - If migration is necessary, treat it as a planned update with full testing before deployment
