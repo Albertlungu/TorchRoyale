@@ -7,4 +7,10 @@ This application will provide Clash Royale players with a recommendation with wh
 The application does not interact with the game client, automate gameplay, or be used in live matches. The tool is intended for research and analysis, not for general public use.
 
 # The Setup
-The user will have two windows open, one with Clash Royale's game client and the other with Tkinter. The latter will display a gameboard with the 
+The user will have two windows open, one with Clash Royale's game client and the other with Tkinter. The latter will display a gameboard with the game squares, and then overlay an image of the card the user should play.
+
+The user then manually drags the card into the arena, ensuring they are placing it directly onto the tile the model recommended.
+
+**This is in accordance with Clash Royale's fair play policies, which strictly disallow any game automation.**
+
+An extension of this could be to overlay the Tkinter window directly onto the game, but make it completely translucent except for the gridlines.
