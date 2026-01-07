@@ -14,3 +14,8 @@ The user then manually drags the card into the arena, ensuring they are placing 
 **This is in accordance with Clash Royale's fair play policies, which strictly disallow any game automation.**
 
 An extension of this could be to overlay the Tkinter window directly onto the game, but make it completely translucent except for the gridlines.
+
+# Resources
+[https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2](https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2)
+
+[https://inference.roboflow.com/quickstart/explore_models/#run-a-private-fine-tuned-model](https://inference.roboflow.com/quickstart/explore_models/#run-a-private-fine-tuned-model)
