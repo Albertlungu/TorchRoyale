@@ -40,15 +40,19 @@ Table 3.0.1: Project Breakdown
 
 | Subproject | Tasks | Difficulty Level |
 | :---- | :---- | :---- |
-| Setup | Create GitHub | 1 |
-|  |  |  |
-|  |  |  |
-| Data Collection | Play and record games |  |
-| Model Training | Train model on chosen dataset to allow it to recognize card | 8 |
-|  | Train model to give recommendations | 13 |
-| Desktop Application (UI) | Add display recommendations on seperate Tkinter application | 5 |
-| Final Presentation | Complete presentation | 3 |
-|  | Practice Presentation | 1 |
+| Setup | Create GitHub repository | 1 |
+| Setup | Set up project documentation | 1 |
+| Model Integration | Set up Roboflow API integration | 3 |
+| Model Integration | Train/fine-tune model on chosen dataset | 5 |
+| Model Integration | Test model accuracy and detection performance | 3 |
+| Desktop Application | Create Tkinter game board UI with grid overlay | 5 |
+| Desktop Application | Implement real-time screenshot/screen capture | 5 |
+| Desktop Application | Build card recommendation algorithm | 8 |
+| Desktop Application | Integrate model with UI for live recommendations | 5 |
+| Testing & Debugging | Test end-to-end application flow | 3 |
+| Testing & Debugging | Debug and optimize performance | 5 |
+| Final Presentation | Complete presentation slides | 5 |
+| Final Presentation | Practice presentation | 1 |
 
 # 4.0 Resources
 
@@ -56,11 +60,39 @@ Table 3.0.1: Project Breakdown
 
 ## 4.1 Team Structure
 
-## 4.2 Software 
+The TorchRoyale team consists of three developers: Kashyap Sukshavasi, Johnathan Han, and Albert Lungu. The team operates with a horizontal management structure, meaning there is no designated project manager and all members share equal responsibility for project outcomes.
 
-List your software design platform here in full (Language(s), servers, IDE's, API's, etc...). You should also include which platform you will be using to manage your project/sprint backlogs (google sheets, github, etc.).
+Work is distributed collaboratively with all team members contributing to all aspects of the project. This approach allows for flexibility in task assignment and ensures that each member gains experience across the full development stack, from model integration to UI development to algorithm design.
 
-Data from [https://universe.roboflow.com/clashroyale/clash-royale-of3d3](https://universe.roboflow.com/clashroyale/clash-royale-of3d3)
+Team coordination occurs through Discord for asynchronous communication and in-person collaboration during class time. All members are expected to participate in technical decisions and contribute to code reviews.
+
+## 4.2 Software
+
+The TorchRoyale project will utilize the following software tools and platforms:
+
+**Programming Language**: Python 3.x
+
+**Desktop Application Framework**: Tkinter (Python standard GUI library)
+
+**Machine Learning & Model**:
+- Roboflow API for model inference and card detection
+- PyTorch or TensorFlow for potential custom model training and fine-tuning
+- Pre-trained model from Roboflow: [https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2](https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2)
+- Dataset: [https://universe.roboflow.com/clashroyale/clash-royale-of3d3](https://universe.roboflow.com/clashroyale/clash-royale-of3d3)
+
+**Development Environment**:
+- IDE: VS Code or PyCharm
+- Version Control: Git
+- Repository Hosting: GitHub
+
+**Project Management**:
+- GitHub Issues and Projects for sprint backlog and task tracking
+- Discord for team communication
+
+**Additional Libraries** (as needed):
+- PIL/Pillow for image processing
+- NumPy for numerical operations
+- Requests for API calls
 
 ## 4.3 Hardware
 
@@ -68,9 +100,7 @@ The device for training and running the model(s) will be done on a ASUS TUF Gami
 
 # 5.0 Risk Analysis
 
-This is a very important component. Outline at least 3 potential risks. Give this some thought so that the risks are realistic and represent the highest risks in terms of likelihood of occurrence (likely to happen) or impact (something that would significantly impact the success of the project).  
-
-For each risk describe preventative measures, corrective actions, and the risk level (the coloured cells in the matrix below).
+This section identifies three major risks that could impact the TorchRoyale project's success, along with their preventative measures, corrective actions, and risk levels.
 
 | Risk Matrix | Severity |  |  |  |
 | ----- | ----- | :---: | :---: | :---: |
@@ -78,6 +108,71 @@ For each risk describe preventative measures, corrective actions, and the risk l
 |  | **High** | High | High | Medium |
 |  | **Medium** | High | Medium | Low |
 |  | **Low** | Medium | Low | Low |
+
+## Risk 1: Model Accuracy and Detection Failures
+
+**Description**: The Roboflow detection model may not accurately identify Clash Royale cards or game state in all scenarios, leading to incorrect or missing recommendations.
+
+**Probability**: Medium
+**Severity**: Major
+**Risk Level**: High
+
+**Preventative Measures**:
+- Thoroughly test the Roboflow model with diverse game scenarios before integration
+- Validate detection accuracy across different card types, game states, and lighting conditions
+- Establish minimum accuracy thresholds (e.g., 90% detection rate) before proceeding to algorithm development
+
+**Corrective Actions**:
+- If accuracy is insufficient, fine-tune the model using additional training data from the Clash Royale dataset
+- Implement confidence thresholds to filter out low-confidence detections
+- Add manual override capability for users to correct misidentified cards
+- Consider ensemble approaches using multiple detection models if a single model proves inadequate
+
+## Risk 2: Clash Royale Game Updates Breaking Detection
+
+**Description**: Supercell may update Clash Royale's user interface, visual assets, or game mechanics, which could invalidate the detection model and break the application's card recognition capabilities.
+
+**Probability**: Low
+**Severity**: Moderate
+**Risk Level**: Medium
+
+**Preventative Measures**:
+- Monitor Clash Royale's official channels and community forums for announced updates
+- Design the detection layer with abstraction to make model swapping easier
+- Document the specific game version and visual assets the model was trained on
+
+**Corrective Actions**:
+- If game updates break detection, immediately assess what visual elements changed
+- Retrain or fine-tune the model using screenshots from the updated game version
+- Maintain a fallback version of the application that works with the previous game version during retraining
+- Leverage the Clash Royale community for updated datasets if available
+
+## Risk 3: Repository Changes in Image Detection Model
+
+**Description**: The upstream Roboflow model or detection repository may be updated, modified, or deprecated, potentially breaking compatibility with the TorchRoyale application.
+
+**Probability**: Low
+**Severity**: Minor
+**Risk Level**: Low
+
+**Preventative Measures**:
+- Fork and version-lock the detection model to maintain a stable copy under team control
+- Document the exact model version, API endpoints, and dependencies being used
+- Store model weights locally if permitted by Roboflow's licensing terms
+
+**Corrective Actions**:
+- If upstream changes occur, continue using the forked/locked version without immediate changes
+- Evaluate whether upstream updates provide benefits worth migrating to
+- If migration is necessary, treat it as a planned update with full testing before deployment
+- Maintain backward compatibility during any model transitions
+
+**Risk Summary Table**:
+
+| Risk | Probability | Severity | Risk Level |
+| :---- | :---- | :---- | :---- |
+| Model Accuracy/Detection Failures | Medium | Major | High |
+| Game Updates Breaking Detection | Low | Moderate | Medium |
+| Repository Changes in Detection Model | Low | Minor | Low |
 
 # 6.0 Team Policies
 
