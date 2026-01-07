@@ -1,1 +1,8 @@
 site_name: TorchRoyale Docs
+nav:
+  - Home: index.md 
+  - About: about.md 
+  - Conduct: coc.md 
+  - Contribute: contribute.md
+theme:
+  name: terminal
