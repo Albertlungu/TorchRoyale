@@ -56,8 +56,6 @@ Table 3.0.1: Project Breakdown
 
 ## 4.1 Team Structure
 
-Outline your team structure, if applicable.
-
 ## 4.2 Software 
 
 List your software design platform here in full (Language(s), servers, IDE's, API's, etc...). You should also include which platform you will be using to manage your project/sprint backlogs (google sheets, github, etc.).
@@ -66,7 +64,7 @@ Data from [https://universe.roboflow.com/clashroyale/clash-royale-of3d3](https:/
 
 ## 4.3 Hardware
 
-List your hardware platform here in full, if applicable.
+The device for training and running the model(s) will be done on a ASUS TUF Gaming A15 Gaming Laptop. It has 16GB of DDR5 RAM, and 512GB HDD.
 
 # 5.0 Risk Analysis
 
