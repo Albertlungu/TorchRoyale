@@ -43,11 +43,12 @@ Table 3.0.1: Project Breakdown
 | Setup | Create GitHub | 1 |
 |  |  |  |
 |  |  |  |
-| Training model | Train model on chosen dataset |  |
-| Creating Desktop Application |  |  |
-|  |  |  |
-|  |  |  |
-| Final Presentation | Complete presentation | 5 |
+| Data Collection | Play and record games |  |
+| Model Training | Train model on chosen dataset to allow it to recognize card | 8 |
+|  | Train model to give recommendations | 13 |
+
+| Desktop Application (UI) | Add display recommendations on seperate Tkinter application | 5 |
+| Final Presentation | Complete presentation | 3 |
 |  | Practice Presentation | 1 |
 
 # 4.0 Resources
