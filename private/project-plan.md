@@ -175,7 +175,7 @@ This section identifies three major risks that could impact the TorchRoyale proj
 | Risk | Probability | Severity | Risk Level |
 | :---- | :---- | :---- | :---- |
 | Model Accuracy/Detection Failures | Medium | Major | High |
-| Game Updates Breaking Detection | Low | Moderate | Medium |
+| Game Updates Breaking Detection | Low | Moderate | Low |
 | Repository Changes in Detection Model | Low | Minor | Low |
 
 # 6.0 Team Policies
