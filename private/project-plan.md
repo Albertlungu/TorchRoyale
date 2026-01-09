@@ -20,20 +20,21 @@ This application will provide Clash Royale players with a recommendation with wh
 
 # 2.0 Client Requirements 
 
-For this project, The design team has chosen to work with Steven Quast, a physics teacher at Merivale High School, in order for him to utilize the application for his friendly Clash Royale games
+For this project, The design team has chosen to work with Steven Quast, a physics teacher at Merivale High School, in order for him to utilize the application for his friendly Clash Royale games.
 
 # 2.1 Client Must-haves
+The client has identified many must-haves for this application which are outlined below.
 
 Add subject line  
 Add must-haves
 
 # 2.2 Client Nice-to-haves
+The client has also identified some additional features that would be nice to include in the application which are outlined below. 
 
 Add subject line  
 Add nice-to-haves
 
 # 3.0 Project Backlog
-
 The project will be broken down into various subprojects. The project backlog can be seen in Table 3.0.1.
 
 Table 3.0.1: Project Breakdown
@@ -123,36 +124,36 @@ This section identifies three major risks that could impact the TorchRoyale proj
 **Risk Level**: High
 
 **Preventing it**:
-- Thoroughly test the Roboflow model with diverse game scenarios before integration
-- Validate detection accuracy across different card types, game states, and lighting conditions
-- Establish minimum accuracy thresholds (e.g., 90% detection rate) before proceeding to algorithm development
+- Test the Roboflow model with many game scenarios before attempting its integration.
+- Check detection accuracy across cards, scenarios, and arenas.
+- Make minimum accuracy thresholds (e.g., 90% detection rate) before going on to develop the algorithm.
 
 **Fixing it**:
-- If accuracy is insufficient, fine-tune the model using additional training data from the Clash Royale dataset
-- Implement confidence thresholds to filter out low-confidence detections
-- Add manual override capability for users to correct misidentified cards
-- Consider ensemble approaches using multiple detection models if a single model proves inadequate
+- If there's not enough accuracy, we should fine-tune the model using more training data from the Clash Royale dataset.
+- Use confidence thresholds to filter out low-confidence detections.
+- Add manual override for users to correct cards that were not correctly identified.
+- Consider using multiple models if a single model is inadequate.
 
 ## Risk 2: Clash Royale Game Updates Breaking Detection
 
-**Description**: Supercell may update Clash Royale's user interface, visual assets, or game mechanics, which could invalidate the detection model and break the application's card recognition capabilities.
+**Description**: Supercell may update Clash Royale's UI, assets, or game mechanics, which could invalidate the detection model and break the application's ability to correctly identify cards.
 
 **Probability**: Low
 
 **Severity**: Moderate
 
-**Risk Level**: Medium
+**Risk Level**: Low
 
 **Preventing it**:
-- Monitor Clash Royale's official channels and community forums for announced updates
-- Design the detection layer with abstraction to make model swapping easier
-- Document the specific game version and visual assets the model was trained on
+- Monitor Clash Royale's official channels and community forums for updates
+- Design the detection layer in a modular way to make model swapping easier
+- Keep the specific game version and visual assets the model was trained on
 
 **Fixing it**:
-- If game updates break detection, immediately assess what visual elements changed
-- Retrain or fine-tune the model using screenshots from the updated game version
-- Maintain a fallback version of the application that works with the previous game version during retraining
-- Leverage the Clash Royale community for updated datasets if available
+- If game updates break detection, immediately check what changed
+- Retrain or fine-tune the model using screenshots from the new game version
+- Keep a fallback version of the game that works with the previous game version during retraining
+- Ask the Clash Royale community for updated datasets if available
 
 ## Risk 3: Repository Changes in Image Detection Model
 
@@ -169,12 +170,6 @@ This section identifies three major risks that could impact the TorchRoyale proj
 - Document the exact model version, API endpoints, and dependencies being used
 - Store model weights locally if permitted by Roboflow's licensing terms
 
-**Fixing it**:
-- If upstream changes occur, continue using the forked/locked version without immediate changes
-- Evaluate whether upstream updates provide benefits worth migrating to
-- If migration is necessary, treat it as a planned update with full testing before deployment
-- Maintain backward compatibility during any model transitions
-
 **Risk Summary Table**:
 
 | Risk | Probability | Severity | Risk Level |
@@ -185,11 +180,11 @@ This section identifies three major risks that could impact the TorchRoyale proj
 
 # 6.0 Team Policies
 
-Our team is able to work on the project during and outside the classroom.
+The team is able to work on the project during and outside the classroom.
 
 Conversations during work time are expected to be on-topic for the most part. We are human and off-topic conversations are expected (and sometimes encouraged).
 
-If a member is unable to attend, they are expected to convey with other members atleast 12 hours prior and work can be completed whenever before the end of the sprint.
+If a member is unable to attend, they are expected to convey with other members at least 12 hours prior and work can be completed whenever before the end of the sprint.
 
 # 6.1 Time Commitment
 
@@ -199,7 +194,7 @@ All members will work in class and if given the time or if more time is needed, 
 
 The members are expected to be active on Discord to make sure updates reach all members. Members are also responsible for making sure updates reach either other (whether online or in-person) 
 
-6.3 Friendship \\(-◡-)/  
+# 6.3 Friendship \\(-◡-)/  
 The team will keep a light atmosphere while working, listening to K-pop playlists and cracking jokes. 
 
 **Learning Goals**
