@@ -106,10 +106,10 @@ The device for training and running the model(s) will be done on a ASUS TUF Gami
 
 This section identifies three major risks that could impact the TorchRoyale project's success, along with their preventative measures, corrective actions, and risk levels.
 
-| Risk Matrix | Severity |  |  |  |
+| Risk Matrix |  | Severity |  |  |
 | ----- | ----- | :---: | :---: | :---: |
-|  **Probability** |  | **Major** | **Moderate** | **Minor** |
-|  | **High** | High | High | Medium |
+|  |  | **Major** | **Moderate** | **Minor** |
+| **Probability** | **High** | High | High | Medium |
 |  | **Medium** | High | Medium | Low |
 |  | **Low** | Medium | Low | Low |
 
