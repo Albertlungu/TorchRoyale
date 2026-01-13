@@ -1,6 +1,13 @@
 # TorchRoyale
 Nerf Miner.
 
+# Installing dependencies
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
 # Overview
 This application will provide Clash Royale players with a recommendation with what cards to play and where to place them. The application will be separate from the main Clash Royale client (played on desktop) and will show where to play a card and what card to play in real time.
 
