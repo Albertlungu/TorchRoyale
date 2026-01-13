@@ -1,3 +1,44 @@
-mkdocs
-mkdocs-terminal
+# docs stuff
+mkdocs>=1.5.0
+mkdocs-terminal>=4.0.0
 
+# pytorch
+torch>=2.0.1
+torchvision>=0.15.2
+torchaudio>=2.0.2
+
+# computer vision and img processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Roboflow
+roboflow>=1.1.0
+inference>=0.9.0
+
+# screen capture
+mss>=9.0.1
+
+# config stuff
+python-dotenv>=1.0.0
+PyYAML>=6.0.0
+pydantic>=2.0.0
+
+# logging
+loguru>=0.7.0
+
+# Data Processing
+pandas>=2.0.0
+
+# test
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# other random stuff
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+ruff>=0.1.0
+
+# TYPEHINTING
+typing-extensions>=4.7.0
