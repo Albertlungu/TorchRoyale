@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn as nn
 import torchvision
@@ -24,9 +26,10 @@ else:
 
 print(f"Using device: {device}")
 
-train_dataset = datasets.ImageFolder(
-    "data/all_data/", transform=transform
-)
+train_dataset = datasets.ImageFolder("data/all_data/", transform=transform)
+
+with open("data/json/class_to_idx.json", "w") as f:
+    json.dump(train_dataset.class_to_idx, f)
 
 use_pin_mem = device.type == "cuda"
 
@@ -73,12 +76,11 @@ for epoch in range(num_epochs):
             "loss": running_loss / len(train_loader),
             "class_to_idx": train_dataset.class_to_idx,
         },
-        f"checkpoint_epoch_{epoch+1}.pth",
+        f"checkpoint_epoch_{epoch + 1}.pth",
     )
 
     print(
-        f"Epoch [{epoch+1}/{num_epochs}] "
-        f"Loss: {running_loss / len(train_loader):.4f}"
+        f"Epoch [{epoch + 1}/{num_epochs}] Loss: {running_loss / len(train_loader):.4f}"
     )
 
 # SAVE FINAL MODEL
