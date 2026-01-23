@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 45
+names: ['cannon', 'cannon-in-hand', 'evo-musketeer', 'evo-musketeer-in-hand', 'evo-skeletons', 'evo-skeletons-in-hand', 'fireball', 'fireball-in-hand', 'hero-ice-golem', 'hero-ice-golem-in-hand', 'hero-musketeer-in-hand', 'hog-rider', 'hog-rider-in-hand', 'ice-golem', 'ice-golem-in-hand', 'ice-spirit', 'ice-spirit-in-hand', 'log', 'log-in-hand', 'minion', 'musketeer', 'musketeer-in-hand', 'opponent-base-bandit', 'opponent-boss-bandit', 'opponent-bowler', 'opponent-cannon', 'opponent-electro-giant', 'opponent-electro-spirit', 'opponent-evo-cannon', 'opponent-evo-royal-ghost', 'opponent-evo-royal-recruits', 'opponent-fireball', 'opponent-golden-knight', 'opponent-hero-wizard', 'opponent-hog-rider', 'opponent-mighty-miner', 'opponent-mini-pekka', 'opponent-minion', 'opponent-minion-horde', 'opponent-musketeer', 'opponent-royal-ghost', 'opponent-royal-recruits', 'opponent-skeletons', 'skeletons', 'skeletons-in-hand']
+
+roboflow:
+  workspace: fafa-zoa5z
+  project: torchroyale
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/fafa-zoa5z/torchroyale/dataset/1
