@@ -40,9 +40,13 @@ model.eval()
 
 # Your 6 test images
 test_files = [
-    "tests/test_indiv/Screenshot 2026-01-21 at 12.47.22 PM.png",
-    "tests/test_indiv/Screenshot 2026-01-21 at 12.47.29 PM.png",
-    "tests/test_indiv/Screenshot 2026-01-21 at 12.47.53 PM.png",
+    "tests/test_indiv/cannon.png",
+    "tests/test_indiv/golem.png",
+    "tests/test_indiv/hog1.png",
+    "tests/test_indiv/hog2.png",
+    "tests/test_indiv/log.png",
+    "tests/test_indiv/musk1.png",
+    "tests/test_indiv/musk2.png",
 ]
 
 # Load class mapping
@@ -53,7 +57,6 @@ idx_to_class = {v: k for k, v in class_to_idx.items()}
 
 # Predict function
 def predict(image_path):
-    preds = []
     # 1. Load the image
     img = Image.open(image_path).convert("RGB")
 
@@ -77,5 +80,6 @@ def predict(image_path):
 # Run predictions
 for file in test_files:
     label = predict(file)
-    print(f"{file} -> {label}")
-    print(label[1])
+    print(f"{file} -> {label[0]}\n")
+    print(f"Other probs: {label[1]}\n\n")
+    # print(label[1])
