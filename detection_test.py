@@ -20,6 +20,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 import cv2
+import numpy as np
 import supervision as sv
 from inference import get_model
 
@@ -103,6 +104,54 @@ class DetectionPipeline:
 
         # Run Roboflow detection
         print("Running Roboflow inference...")
+        results = self.model.infer(image)[0]
+
+        # Convert to supervision format for visualization
+        sv_detections = sv.Detections.from_inference(results)
+
+        # Extract and map detections
+        detections = self._extract_detections(results)
+
+        # Create annotated image
+        annotated_image = self._annotate_image(image.copy(), sv_detections, detections)
+
+        # Build grid state
+        grid_state = self._build_grid_state(detections)
+
+        return {
+            "detections": detections,
+            "image": image,
+            "annotated_image": annotated_image,
+            "grid_state": grid_state,
+            "mapper": self.mapper,
+        }
+
+    def process_image_array(self, image: np.ndarray) -> Dict[str, Any]:
+        """
+        Process a numpy array image through the full pipeline.
+
+        This is the same as process_image but accepts a numpy array directly,
+        useful for video frame processing where frames are already in memory.
+
+        Args:
+            image: Image as numpy array (BGR format from cv2)
+
+        Returns:
+            Dictionary containing:
+            - detections: List of Detection objects
+            - image: Original image (numpy array)
+            - annotated_image: Image with bounding boxes drawn
+            - grid_state: 2D representation of what's on each tile
+        """
+        if image is None or image.size == 0:
+            raise ValueError("Invalid image array")
+
+        height, width = image.shape[:2]
+
+        # Calibrate coordinate mapper for this image
+        self._calibrate_mapper(width, height)
+
+        # Run Roboflow detection
         results = self.model.infer(image)[0]
 
         # Convert to supervision format for visualization

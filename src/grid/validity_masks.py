@@ -14,6 +14,9 @@ import numpy as np
 
 from .coordinate_mapper import CoordinateMapper
 
+# Import elixir costs from constants module for convenience
+from ..constants.game_constants import ELIXIR_COSTS, get_elixir_cost
+
 
 class CardType(Enum):
     """Categories of cards with different placement rules."""
