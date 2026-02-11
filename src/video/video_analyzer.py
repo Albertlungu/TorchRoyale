@@ -27,16 +27,17 @@ from src.constants.game_constants import GamePhase, ElixirConstants
 from src.constants.ui_regions import UIRegions
 from src.ocr.digit_detector import DigitDetector
 from src.game_state.game_phase import GamePhaseTracker
-from src.game_state.health_detector import HealthBarDetector, HealthBarResult
+from src.game_state.health_detector import TowerHealthDetector, TowerHealthResult
 from src.recommendation.elixir_manager import OpponentElixirTracker, PlayerElixirTracker
 
 
 @dataclass
 class TowerHealth:
     """Health status for a single tower."""
-    health_percent: float
+    hp_current: Optional[int]
+    hp_max: int
+    health_percent: Optional[float]  # None = unknown (OCR failure)
     is_destroyed: bool = False
-    bar_visible: bool = False
 
 
 @dataclass
@@ -135,8 +136,16 @@ class VideoAnalyzer:
         self._phase_tracker: Optional[GamePhaseTracker] = None
         self._opponent_tracker: Optional[OpponentElixirTracker] = None
         self._player_tracker: Optional[PlayerElixirTracker] = None
-        self._health_detector: Optional[HealthBarDetector] = None
+        self._health_detector: Optional[TowerHealthDetector] = None
         self._ui_regions: Optional[UIRegions] = None
+
+        # Tower levels (detected once and reused)
+        self._player_level: int = 15
+        self._opponent_level: int = 15
+        self._levels_detected: bool = False
+
+        # Last known tower health (for fallback when OCR fails on princess)
+        self._last_tower_health: Dict[str, TowerHealthResult] = {}
 
     def _initialize_components(self):
         """Initialize all analysis components."""
@@ -145,7 +154,7 @@ class VideoAnalyzer:
         self._phase_tracker = GamePhaseTracker()
         self._opponent_tracker = OpponentElixirTracker()
         self._player_tracker = PlayerElixirTracker()
-        self._health_detector = HealthBarDetector()
+        self._health_detector = TowerHealthDetector()
 
         # Detection pipeline is imported lazily to avoid circular imports
         # and to not require Roboflow API key until needed
@@ -187,6 +196,10 @@ class VideoAnalyzer:
         self._phase_tracker.reset()
         self._opponent_tracker.reset()
         self._player_tracker.reset()
+        self._levels_detected = False
+        self._player_level = 15
+        self._opponent_level = 15
+        self._last_tower_health = {}
 
         if self.verbose:
             print(f"Processing video: {video_path}")
@@ -277,6 +290,7 @@ class VideoAnalyzer:
         # Default values
         detections = []
         hand_cards = []
+        raw_detections = []
 
         # Run Roboflow detection if available
         if self._detection_pipeline is not None:
@@ -355,21 +369,60 @@ class VideoAnalyzer:
             opponent_detections=opponent_det_proxies
         )
 
-        # Detect tower health
-        tower_regions = self._ui_regions.get_all_tower_regions()
-        tower_health = self._health_detector.detect_all_towers(
-            frame,
-            {name: region.to_tuple() for name, region in tower_regions.items()}
-        )
+        # Extract tower detections from Roboflow results
+        tower_dets = []
+        for det in raw_detections:
+            if "tower" in det.class_name:
+                tower_dets.append({
+                    "class_name": det.class_name,
+                    "pixel_x": det.pixel_x,
+                    "pixel_y": det.pixel_y,
+                    "pixel_width": det.pixel_width,
+                    "pixel_height": det.pixel_height,
+                    "is_opponent": det.is_opponent,
+                })
+
+        # Detect tower levels from king towers (once)
+        if not self._levels_detected and tower_dets:
+            for td in tower_dets:
+                if "king" in td["class_name"]:
+                    level = self._health_detector.detect_tower_level(
+                        frame,
+                        td["pixel_x"], td["pixel_y"],
+                        td["pixel_width"], td["pixel_height"],
+                        td["is_opponent"],
+                    )
+                    if td["is_opponent"]:
+                        self._opponent_level = level
+                    else:
+                        self._player_level = level
+            self._levels_detected = True
+
+        # Detect tower health via OCR
+        tower_health = {}
+        if tower_dets:
+            tower_health = self._health_detector.detect_all_towers(
+                frame, tower_dets,
+                player_level=self._player_level,
+                opponent_level=self._opponent_level,
+            )
+
+        # Use last known health for princess towers where OCR failed
+        for name, result in tower_health.items():
+            if result.health_percent is not None:
+                self._last_tower_health[name] = result
+            elif name in self._last_tower_health:
+                tower_health[name] = self._last_tower_health[name]
 
         # Separate player and opponent towers
         player_towers = {}
         opponent_towers = {}
-        for name, health in tower_health.items():
+        for name, th in tower_health.items():
             tower_data = {
-                "health_percent": round(health.health_percent, 1),
-                "is_destroyed": health.health_percent <= 0,
-                "bar_visible": health.bar_visible,
+                "hp_current": th.hp_current,
+                "hp_max": th.hp_max,
+                "health_percent": round(th.health_percent, 1) if th.health_percent is not None else None,
+                "is_destroyed": th.is_destroyed,
             }
             if name.startswith("player_"):
                 player_towers[name] = tower_data

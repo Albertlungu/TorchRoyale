@@ -20,20 +20,22 @@ class ArenaBounds:
     """
     Defines the pixel boundaries of the playable arena within a screenshot.
 
-    These values need to be calibrated for your specific screen resolution
-    and capture setup. The default values are estimates for a 1080x2400 screen.
+    Calibrated from reference resolution 1170x2532:
+    - Arena origin: (27.6, 376.7)
+    - Tile size: 62x50 px (width x height)
+    - Arena: 18 tiles wide (1116 px), 32 tiles tall (1600 px)
     """
     # Top-left corner of the arena (pixel coordinates)
-    x_min: int = 0
-    y_min: int = 280  # Below the top UI (player info, timer)
+    x_min: int = 28
+    y_min: int = 327
 
     # Bottom-right corner of the arena (pixel coordinates)
-    x_max: int = 1080
-    y_max: int = 1920  # Above the card hand UI
+    x_max: int = 1144  # 28 + 18*62
+    y_max: int = 1927  # 327 + 32*50
 
     # Full image dimensions (for validation)
-    image_width: int = 1080
-    image_height: int = 2400
+    image_width: int = 1170
+    image_height: int = 2532
 
     @property
     def arena_width(self) -> int:
@@ -171,23 +173,39 @@ class CoordinateMapper:
         """Check if a tile is a bridge."""
         return tile_y in self.RIVER_ROWS and tile_x in self.BRIDGE_TILES_X
 
-    def calibrate_from_image(self, image_width: int, image_height: int,
-                             arena_top_ratio: float = 0.12,
-                             arena_bottom_ratio: float = 0.80) -> None:
+    # Reference values calibrated from 1170x2532 screenshots
+    _REF_WIDTH = 1170
+    _REF_HEIGHT = 2532
+    _REF_ORIGIN_X = 27.6
+    _REF_ORIGIN_Y = 326.7
+    _REF_TILE_W = 62.0
+    _REF_TILE_H = 50.0
+
+    def calibrate_from_image(self, image_width: int, image_height: int) -> None:
         """
         Auto-calibrate arena bounds based on image dimensions.
+
+        Scales from the reference resolution (1170x2532) where:
+        - Arena origin: (27.6, 376.7)
+        - Tile size: 62x50 px
 
         Args:
             image_width: Width of the screenshot in pixels
             image_height: Height of the screenshot in pixels
-            arena_top_ratio: Ratio of image height where arena starts (default 12%)
-            arena_bottom_ratio: Ratio of image height where arena ends (default 80%)
         """
+        scale_x = image_width / self._REF_WIDTH
+        scale_y = image_height / self._REF_HEIGHT
+
+        x_min = self._REF_ORIGIN_X * scale_x
+        y_min = self._REF_ORIGIN_Y * scale_y
+        tile_w = self._REF_TILE_W * scale_x
+        tile_h = self._REF_TILE_H * scale_y
+
         self.bounds = ArenaBounds(
-            x_min=0,
-            y_min=int(image_height * arena_top_ratio),
-            x_max=image_width,
-            y_max=int(image_height * arena_bottom_ratio),
+            x_min=int(round(x_min)),
+            y_min=int(round(y_min)),
+            x_max=int(round(x_min + self.GRID_WIDTH * tile_w)),
+            y_max=int(round(y_min + self.GRID_HEIGHT * tile_h)),
             image_width=image_width,
             image_height=image_height
         )

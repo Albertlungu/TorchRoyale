@@ -189,8 +189,6 @@ class DetectionPipeline:
         self.mapper.calibrate_from_image(
             image_width=image_width,
             image_height=image_height,
-            arena_top_ratio=0.10,   # Arena starts 10% from top
-            arena_bottom_ratio=0.80  # Arena ends 80% from top (above card hand)
         )
         self.validator = PlacementValidator(self.mapper)
 
@@ -284,7 +282,7 @@ class DetectionPipeline:
             cv2.line(overlay,
                      (px, self.mapper.bounds.y_min),
                      (px, self.mapper.bounds.y_max),
-                     (255, 255, 255), 1)
+                     (0, 255, 0), 2)
 
         # Draw horizontal lines
         for y in range(self.mapper.GRID_HEIGHT + 1):
@@ -292,7 +290,7 @@ class DetectionPipeline:
             cv2.line(overlay,
                      (self.mapper.bounds.x_min, py),
                      (self.mapper.bounds.x_max, py),
-                     (255, 255, 255), 1)
+                     (0, 255, 0), 2)
 
         # Highlight river tiles
         for y in self.mapper.RIVER_ROWS:

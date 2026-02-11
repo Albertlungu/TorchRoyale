@@ -5,7 +5,9 @@ Detection logic:
 - Towers display their current HP as white text on a health bar
 - Player tower HP appears below the tower center
 - Opponent tower HP appears above the tower center
-- No HP text visible = tower is at full health
+- King tower: no HP text visible = tower is at full health
+- Princess tower: always displays HP (even at full health). If not detected
+  by Roboflow, the tower is destroyed.
 - Tower level is read from the king tower to look up max HP
 """
 
@@ -20,10 +22,11 @@ from ..constants.game_constants import get_tower_max_hp
 @dataclass
 class TowerHealthResult:
     """Result of tower health detection."""
-    hp_current: Optional[int]  # None if not detected (full HP)
+    hp_current: Optional[int]  # None if not detected
     hp_max: int
-    health_percent: float  # 0-100
+    health_percent: Optional[float]  # 0-100, None if unknown (OCR failure on princess)
     detected: bool  # Whether HP text was found
+    is_destroyed: bool = False
     raw_text: str = ""
 
 
@@ -90,19 +93,32 @@ class TowerHealthDetector:
         )
 
         if hp_region is None:
-            return TowerHealthResult(
-                hp_current=None, hp_max=hp_max,
-                health_percent=100.0, detected=False
-            )
+            # King tower: assume full HP. Princess tower: unknown (OCR failure).
+            if is_king:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=100.0, detected=False
+                )
+            else:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=None, detected=False
+                )
 
         x1, y1, x2, y2 = hp_region
         roi = image[y1:y2, x1:x2]
 
         if roi.size == 0:
-            return TowerHealthResult(
-                hp_current=None, hp_max=hp_max,
-                health_percent=100.0, detected=False
-            )
+            if is_king:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=100.0, detected=False
+                )
+            else:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=None, detected=False
+                )
 
         # Preprocess and run OCR
         processed = self._digit_detector._preprocess_for_ocr(roi)
@@ -114,17 +130,29 @@ class TowerHealthDetector:
                 min_size=5,
             )
         except Exception:
-            return TowerHealthResult(
-                hp_current=None, hp_max=hp_max,
-                health_percent=100.0, detected=False
-            )
+            if is_king:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=100.0, detected=False
+                )
+            else:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=None, detected=False
+                )
 
         if not results:
-            # No text found = tower at full HP
-            return TowerHealthResult(
-                hp_current=None, hp_max=hp_max,
-                health_percent=100.0, detected=False
-            )
+            # King tower: no text = full HP. Princess tower: no text = OCR failure.
+            if is_king:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=100.0, detected=False
+                )
+            else:
+                return TowerHealthResult(
+                    hp_current=None, hp_max=hp_max,
+                    health_percent=None, detected=False
+                )
 
         # Try each OCR result (sorted by confidence) to find a valid HP
         sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
@@ -139,13 +167,20 @@ class TowerHealthDetector:
                     raw_text=raw_text
                 )
 
-        # No valid HP found -- tower is at full HP
+        # No valid HP parsed from OCR results
         all_text = "|".join(r[1] for r in results)
-        return TowerHealthResult(
-            hp_current=None, hp_max=hp_max,
-            health_percent=100.0, detected=False,
-            raw_text=all_text
-        )
+        if is_king:
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False,
+                raw_text=all_text
+            )
+        else:
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=None, detected=False,
+                raw_text=all_text
+            )
 
     def _get_hp_region(
         self,
@@ -175,8 +210,8 @@ class TowerHealthDetector:
             y2 = max(0, cy - int(bh * 0.2))
         elif is_opponent:
             # Opponent princess: HP on pink bar above the tower
-            y1 = max(0, cy - int(bh * 0.55))
-            y2 = max(0, cy - int(bh * 0.3))
+            y1 = max(0, cy - int(bh * 0.6))
+            y2 = max(0, cy - int(bh * 0.25))
         elif is_king:
             # Player king tower: HP is near the bottom of the tall bbox
             y1 = min(img_h, cy + int(bh * 0.2))
@@ -215,6 +250,14 @@ class TowerHealthDetector:
             suffix = text[-length:]
             value = int(suffix)
             if 100 <= value <= hp_max:
+                return value
+
+        # Accept small HP values (1-99) when text is short (1-2 chars).
+        # These can't be confused with a level badge prefix since
+        # the OCR search region only covers where HP text appears.
+        if len(text) <= 2:
+            value = int(text)
+            if 1 <= value <= hp_max:
                 return value
 
         return None
@@ -299,6 +342,9 @@ class TowerHealthDetector:
         """
         Detect HP for all towers from Roboflow detections.
 
+        Princess towers that are NOT detected by Roboflow are considered
+        destroyed (Roboflow only fails to detect them when they're gone).
+
         Args:
             image: Full frame (BGR format)
             tower_detections: List of dicts with keys:
@@ -338,6 +384,22 @@ class TowerHealthDetector:
                 is_king=is_king,
                 level=level,
             )
+
+        # Princess towers not detected by Roboflow = destroyed
+        princess_tower_names = [
+            "player_left", "player_right",
+            "opponent_left", "opponent_right",
+        ]
+        for name in princess_tower_names:
+            if name not in results:
+                is_opp = name.startswith("opponent")
+                level = opponent_level if is_opp else player_level
+                hp_max = get_tower_max_hp(level, is_king=False)
+                results[name] = TowerHealthResult(
+                    hp_current=0, hp_max=hp_max,
+                    health_percent=0.0, detected=True,
+                    is_destroyed=True,
+                )
 
         return results
 
