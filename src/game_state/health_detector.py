@@ -1,265 +1,373 @@
 """
-Health bar detector for towers and troops.
+Tower health detector using OCR to read HP numbers.
 
 Detection logic:
-- No health bar visible = 100% health (full HP)
-- Health bar visible = (colored portion / total bar length) * 100
-
-Health bars use color gradients:
-- Green: High health
-- Yellow/Orange: Medium health
-- Red: Low health
+- Towers display their current HP as white text on a health bar
+- Player tower HP appears below the tower center
+- Opponent tower HP appears above the tower center
+- No HP text visible = tower is at full health
+- Tower level is read from the king tower to look up max HP
 """
 
 import cv2
 import numpy as np
-from typing import Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 from dataclasses import dataclass
+
+from ..constants.game_constants import get_tower_max_hp
 
 
 @dataclass
+class TowerHealthResult:
+    """Result of tower health detection."""
+    hp_current: Optional[int]  # None if not detected (full HP)
+    hp_max: int
+    health_percent: float  # 0-100
+    detected: bool  # Whether HP text was found
+    raw_text: str = ""
+
+
+# Keep old class for backwards compatibility
+@dataclass
 class HealthBarResult:
-    """Result of health bar detection."""
+    """Result of health bar detection (legacy)."""
     health_percent: float  # 0-100
     bar_visible: bool
     confidence: float
 
 
-class HealthBarDetector:
+class TowerHealthDetector:
     """
-    Detects health percentage from health bars.
+    Detects tower HP by reading the number displayed on each tower.
 
-    Uses color-based detection to identify:
-    - Health bar presence
-    - Colored (remaining health) vs gray (lost health) portions
+    Uses Roboflow tower detections to locate towers, then runs OCR
+    on the HP text region relative to each tower's bounding box.
 
-    Tower health bars appear above destroyed portions,
-    troop health bars appear above the unit.
+    Usage:
+        detector = TowerHealthDetector()
+        results = detector.detect_all_towers(image, tower_detections, level=15)
     """
 
     def __init__(self):
-        """Initialize health bar detector with color ranges."""
-        # Health bar colors (HSV ranges)
-        # Green: High health
-        self.green_lower = np.array([35, 80, 80])
-        self.green_upper = np.array([85, 255, 255])
+        """Initialize the tower health detector."""
+        from ..ocr.digit_detector import DigitDetector
+        self._digit_detector = DigitDetector()
 
-        # Yellow/Orange: Medium health
-        self.yellow_lower = np.array([15, 80, 80])
-        self.yellow_upper = np.array([35, 255, 255])
-
-        # Red: Low health
-        self.red_lower1 = np.array([0, 80, 80])
-        self.red_upper1 = np.array([15, 255, 255])
-        self.red_lower2 = np.array([165, 80, 80])
-        self.red_upper2 = np.array([180, 255, 255])
-
-        # Gray background (depleted health)
-        self.gray_lower = np.array([0, 0, 40])
-        self.gray_upper = np.array([180, 50, 150])
-
-    def detect_health(
+    def detect_tower_hp(
         self,
         image: np.ndarray,
-        region: Tuple[int, int, int, int]
-    ) -> HealthBarResult:
+        tower_cx: int,
+        tower_cy: int,
+        tower_w: int,
+        tower_h: int,
+        is_opponent: bool,
+        is_king: bool,
+        level: int = 15,
+    ) -> TowerHealthResult:
         """
-        Detect health percentage from a region.
+        Detect HP for a single tower using OCR.
 
         Args:
             image: Full frame (BGR format)
-            region: (x_min, y_min, x_max, y_max) of health bar area
+            tower_cx: Tower bounding box center x
+            tower_cy: Tower bounding box center y
+            tower_w: Tower bounding box width
+            tower_h: Tower bounding box height
+            is_opponent: True if opponent tower
+            is_king: True if king tower
+            level: Tower level for max HP lookup
 
         Returns:
-            HealthBarResult with health percentage
+            TowerHealthResult with current and max HP
         """
-        x1, y1, x2, y2 = region
+        img_h, img_w = image.shape[:2]
+        hp_max = get_tower_max_hp(level, is_king)
+
+        # Compute HP text search region relative to tower bbox
+        hp_region = self._get_hp_region(
+            tower_cx, tower_cy, tower_w, tower_h,
+            is_opponent, img_w, img_h, is_king=is_king
+        )
+
+        if hp_region is None:
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False
+            )
+
+        x1, y1, x2, y2 = hp_region
         roi = image[y1:y2, x1:x2]
 
         if roi.size == 0:
-            return HealthBarResult(
-                health_percent=100.0,
-                bar_visible=False,
-                confidence=0.0
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False
             )
 
-        # Convert to HSV
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-        # Create masks for health colors
-        green_mask = cv2.inRange(hsv, self.green_lower, self.green_upper)
-        yellow_mask = cv2.inRange(hsv, self.yellow_lower, self.yellow_upper)
-
-        # Red needs two ranges (wraps around in HSV)
-        red_mask1 = cv2.inRange(hsv, self.red_lower1, self.red_upper1)
-        red_mask2 = cv2.inRange(hsv, self.red_lower2, self.red_upper2)
-        red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-
-        # Combine all health colors
-        health_mask = cv2.bitwise_or(green_mask, yellow_mask)
-        health_mask = cv2.bitwise_or(health_mask, red_mask)
-
-        # Gray background (depleted portion)
-        gray_mask = cv2.inRange(hsv, self.gray_lower, self.gray_upper)
-
-        # Total bar area
-        total_mask = cv2.bitwise_or(health_mask, gray_mask)
-
-        # Count pixels
-        health_pixels = cv2.countNonZero(health_mask)
-        total_pixels = cv2.countNonZero(total_mask)
-
-        # Minimum pixels to consider bar present
-        min_bar_pixels = roi.shape[0] * roi.shape[1] * 0.02  # 2% of region
-
-        if total_pixels < min_bar_pixels:
-            # No health bar detected - assume full health
-            return HealthBarResult(
-                health_percent=100.0,
-                bar_visible=False,
-                confidence=0.9
+        # Preprocess and run OCR
+        processed = self._digit_detector._preprocess_for_ocr(roi)
+        try:
+            results = self._digit_detector.reader.readtext(
+                processed,
+                allowlist='0123456789',
+                paragraph=False,
+                min_size=5,
+            )
+        except Exception:
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False
             )
 
-        # Calculate health percentage
-        if total_pixels > 0:
-            health_percent = (health_pixels / total_pixels) * 100
-        else:
-            health_percent = 100.0
+        if not results:
+            # No text found = tower at full HP
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False
+            )
 
-        # Determine confidence based on detection quality
-        confidence = min(1.0, total_pixels / (min_bar_pixels * 5))
+        # Try each OCR result (sorted by confidence) to find a valid HP
+        sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
+        for bbox, text, confidence in sorted_results:
+            raw_text = text.strip()
+            hp_value = self._parse_hp_text(raw_text, hp_max)
+            if hp_value is not None and confidence > 0.3:
+                health_pct = min(100.0, (hp_value / hp_max) * 100)
+                return TowerHealthResult(
+                    hp_current=hp_value, hp_max=hp_max,
+                    health_percent=health_pct, detected=True,
+                    raw_text=raw_text
+                )
 
-        return HealthBarResult(
-            health_percent=min(100.0, max(0.0, health_percent)),
-            bar_visible=True,
-            confidence=confidence
+        # No valid HP found -- tower is at full HP
+        all_text = "|".join(r[1] for r in results)
+        return TowerHealthResult(
+            hp_current=None, hp_max=hp_max,
+            health_percent=100.0, detected=False,
+            raw_text=all_text
         )
 
-    def detect_health_horizontal(
+    def _get_hp_region(
+        self,
+        cx: int, cy: int, bw: int, bh: int,
+        is_opponent: bool,
+        img_w: int, img_h: int,
+        is_king: bool = False,
+    ) -> Optional[Tuple[int, int, int, int]]:
+        """
+        Compute the pixel region where HP text appears relative to tower bbox.
+
+        The HP number sits on a health bar next to a level badge.
+        - Player princess towers: HP bar is near tower center
+        - Player king tower: HP bar is further below center (taller tower)
+        - Opponent towers: HP bar is above the tower (near top of bbox)
+
+        Returns:
+            (x1, y1, x2, y2) or None
+        """
+        # Wide enough to capture the full HP number
+        x1 = max(0, cx - int(bw * 0.4))
+        x2 = min(img_w, cx + int(bw * 0.9))
+
+        if is_opponent and is_king:
+            # Opponent king: HP bar just above the tower (king bbox is tall)
+            y1 = max(0, cy - int(bh * 0.4))
+            y2 = max(0, cy - int(bh * 0.2))
+        elif is_opponent:
+            # Opponent princess: HP on pink bar above the tower
+            y1 = max(0, cy - int(bh * 0.55))
+            y2 = max(0, cy - int(bh * 0.3))
+        elif is_king:
+            # Player king tower: HP is near the bottom of the tall bbox
+            y1 = min(img_h, cy + int(bh * 0.2))
+            y2 = min(img_h, cy + int(bh * 0.5))
+        else:
+            # Player princess towers: HP near tower center
+            y1 = max(0, cy - int(bh * 0.1))
+            y2 = min(img_h, cy + int(bh * 0.25))
+
+        if y2 <= y1 or x2 <= x1:
+            return None
+
+        return (x1, y1, x2, y2)
+
+    def _parse_hp_text(self, text: str, hp_max: int) -> Optional[int]:
+        """
+        Parse OCR text into an HP value.
+
+        OCR often reads the level badge (1-2 digits) concatenated with the
+        HP text (3-5 digits), e.g. "152384" = level 15 + HP 2384.
+        We try progressively shorter suffixes to find a valid HP value.
+
+        Args:
+            text: Raw OCR text (digits only)
+            hp_max: Maximum possible HP for this tower
+
+        Returns:
+            HP value or None if invalid
+        """
+        if not text or not text.isdigit():
+            return None
+
+        # Try substrings from the end: last 5, 4, 3 digits
+        # This strips the level badge prefix
+        for length in range(min(5, len(text)), 2, -1):
+            suffix = text[-length:]
+            value = int(suffix)
+            if 100 <= value <= hp_max:
+                return value
+
+        return None
+
+    def detect_tower_level(
         self,
         image: np.ndarray,
-        region: Tuple[int, int, int, int]
-    ) -> HealthBarResult:
+        king_cx: int,
+        king_cy: int,
+        king_w: int,
+        king_h: int,
+        is_opponent: bool,
+    ) -> int:
         """
-        Detect health from a horizontal bar using left-to-right analysis.
-
-        Better for tower health bars where colored portion extends from left.
+        Detect tower level from the king tower's golden crown badge.
 
         Args:
             image: Full frame (BGR format)
-            region: (x_min, y_min, x_max, y_max)
+            king_cx, king_cy: King tower bbox center
+            king_w, king_h: King tower bbox dimensions
+            is_opponent: True if opponent king tower
 
         Returns:
-            HealthBarResult
+            Detected level (1-16), defaults to 15 if detection fails
         """
-        x1, y1, x2, y2 = region
+        img_h, img_w = image.shape[:2]
+
+        # The level badge is near the bottom-left of player king tower
+        # or top-left of opponent king tower
+        badge_w = king_w // 3
+        badge_h = king_h // 4
+
+        if is_opponent:
+            x1 = max(0, king_cx - king_w // 2 - badge_w // 2)
+            y1 = max(0, king_cy - king_h // 2 - badge_h)
+            x2 = min(img_w, x1 + badge_w)
+            y2 = min(img_h, y1 + badge_h)
+        else:
+            x1 = max(0, king_cx - king_w // 2 - badge_w // 2)
+            y1 = min(img_h, king_cy + king_h // 4)
+            x2 = min(img_w, x1 + badge_w)
+            y2 = min(img_h, y1 + badge_h)
+
+        if y2 <= y1 or x2 <= x1:
+            return 15
+
         roi = image[y1:y2, x1:x2]
+        if roi.size == 0:
+            return 15
 
-        if roi.size == 0 or roi.shape[1] == 0:
-            return HealthBarResult(
-                health_percent=100.0,
-                bar_visible=False,
-                confidence=0.0
+        processed = self._digit_detector._preprocess_for_ocr(roi)
+        try:
+            results = self._digit_detector.reader.readtext(
+                processed,
+                allowlist='0123456789',
+                paragraph=False,
+                min_size=5,
             )
+        except Exception:
+            return 15
 
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        if not results:
+            return 15
 
-        # Combine all health colors
-        green_mask = cv2.inRange(hsv, self.green_lower, self.green_upper)
-        yellow_mask = cv2.inRange(hsv, self.yellow_lower, self.yellow_upper)
-        red_mask1 = cv2.inRange(hsv, self.red_lower1, self.red_upper1)
-        red_mask2 = cv2.inRange(hsv, self.red_lower2, self.red_upper2)
+        best = max(results, key=lambda x: x[2])
+        text = best[1].strip()
 
-        health_mask = cv2.bitwise_or(green_mask, yellow_mask)
-        health_mask = cv2.bitwise_or(health_mask, red_mask1)
-        health_mask = cv2.bitwise_or(health_mask, red_mask2)
+        if text.isdigit():
+            level = int(text)
+            if 1 <= level <= 16:
+                return level
 
-        # Find rightmost health pixel (edge of remaining health)
-        column_sums = np.sum(health_mask, axis=0)
-
-        if np.max(column_sums) < roi.shape[0] * 0.1:  # Less than 10% of height
-            return HealthBarResult(
-                health_percent=100.0,
-                bar_visible=False,
-                confidence=0.9
-            )
-
-        # Find the rightmost column with significant health pixels
-        threshold = roi.shape[0] * 0.2
-        health_columns = np.where(column_sums > threshold)[0]
-
-        if len(health_columns) == 0:
-            return HealthBarResult(
-                health_percent=0.0,
-                bar_visible=True,
-                confidence=0.7
-            )
-
-        rightmost_health = health_columns[-1]
-        total_width = roi.shape[1]
-
-        health_percent = (rightmost_health / total_width) * 100
-
-        return HealthBarResult(
-            health_percent=min(100.0, max(0.0, health_percent)),
-            bar_visible=True,
-            confidence=0.8
-        )
+        return 15
 
     def detect_all_towers(
         self,
         image: np.ndarray,
-        tower_regions: Dict[str, Tuple[int, int, int, int]]
-    ) -> Dict[str, HealthBarResult]:
+        tower_detections: List[Dict],
+        player_level: int = 15,
+        opponent_level: int = 15,
+    ) -> Dict[str, TowerHealthResult]:
         """
-        Detect health for all towers.
+        Detect HP for all towers from Roboflow detections.
 
         Args:
-            image: Full frame
-            tower_regions: Dict mapping tower names to region tuples
+            image: Full frame (BGR format)
+            tower_detections: List of dicts with keys:
+                class_name, pixel_x, pixel_y, pixel_width, pixel_height, is_opponent
+            player_level: Player tower level
+            opponent_level: Opponent tower level
 
         Returns:
-            Dict mapping tower names to HealthBarResult
+            Dict mapping tower names to TowerHealthResult
         """
         results = {}
 
-        for tower_name, region in tower_regions.items():
-            # Use horizontal detection for towers
-            results[tower_name] = self.detect_health_horizontal(image, region)
+        for det in tower_detections:
+            class_name = det["class_name"]
+            is_opponent = det["is_opponent"]
+            is_king = "king" in class_name
+
+            # Determine tower name for the results dict
+            if is_king:
+                name = "opponent_king" if is_opponent else "player_king"
+            else:
+                # Distinguish left vs right princess tower by x position
+                img_center_x = image.shape[1] // 2
+                side = "left" if det["pixel_x"] < img_center_x else "right"
+                prefix = "opponent" if is_opponent else "player"
+                name = f"{prefix}_{side}"
+
+            level = opponent_level if is_opponent else player_level
+
+            results[name] = self.detect_tower_hp(
+                image,
+                tower_cx=det["pixel_x"],
+                tower_cy=det["pixel_y"],
+                tower_w=det["pixel_width"],
+                tower_h=det["pixel_height"],
+                is_opponent=is_opponent,
+                is_king=is_king,
+                level=level,
+            )
 
         return results
 
-    def detect_troop_health(
+    def get_hp_region(
         self,
-        image: np.ndarray,
-        bbox: Tuple[int, int, int, int]
-    ) -> HealthBarResult:
-        """
-        Detect health for a troop from its bounding box.
-
-        Troop health bars appear above the unit, so we look
-        in the area above the bounding box.
-
-        Args:
-            image: Full frame
-            bbox: (x_min, y_min, x_max, y_max) of the troop
-
-        Returns:
-            HealthBarResult
-        """
-        x1, y1, x2, y2 = bbox
-
-        # Health bar is typically above the unit
-        bar_height = int((y2 - y1) * 0.15)  # ~15% of unit height
-        bar_y1 = max(0, y1 - bar_height)
-        bar_y2 = y1
-
-        # Slightly wider than unit
-        padding = int((x2 - x1) * 0.1)
-        bar_x1 = max(0, x1 - padding)
-        bar_x2 = min(image.shape[1], x2 + padding)
-
-        return self.detect_health_horizontal(image, (bar_x1, bar_y1, bar_x2, bar_y2))
+        tower_cx: int,
+        tower_cy: int,
+        tower_w: int,
+        tower_h: int,
+        is_opponent: bool,
+        img_w: int,
+        img_h: int,
+        is_king: bool = False,
+    ) -> Optional[Tuple[int, int, int, int]]:
+        """Public access to HP region computation for debug drawing."""
+        return self._get_hp_region(
+            tower_cx, tower_cy, tower_w, tower_h,
+            is_opponent, img_w, img_h, is_king=is_king
+        )
 
     def __repr__(self) -> str:
-        return "HealthBarDetector()"
+        return "TowerHealthDetector()"
+
+
+# Keep old class available for backwards compatibility
+class HealthBarDetector:
+    """Legacy health bar detector. Use TowerHealthDetector instead."""
+
+    def detect_health(self, image, region) -> HealthBarResult:
+        return HealthBarResult(health_percent=100.0, bar_visible=False, confidence=0.0)
+
+    def __repr__(self) -> str:
+        return "HealthBarDetector(legacy)"

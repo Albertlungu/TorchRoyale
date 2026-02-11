@@ -2,12 +2,12 @@
 Game constants for Clash Royale mechanics.
 
 Contains elixir regeneration rates, game phase definitions,
-and card elixir costs.
+tower HP tables, and card elixir costs.
 """
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict
+from typing import Dict, Tuple
 
 
 class GamePhase(Enum):
@@ -40,37 +40,102 @@ class GameTimingConstants:
     TRIPLE_ELIXIR_START: int = 60      # Last 1 min of sudden death triggers x3
 
 
+# Tower HP by level: maps level -> (king_tower_hp, princess_tower_hp)
+TOWER_HP: Dict[int, Tuple[int, int]] = {
+    1:  (2400, 1400),
+    2:  (2568, 1512),
+    3:  (2736, 1624),
+    4:  (2904, 1750),
+    5:  (3096, 1890),
+    6:  (3312, 2030),
+    7:  (3528, 2184),
+    8:  (3768, 2352),
+    9:  (4008, 2534),
+    10: (4411, 2786),
+    11: (4824, 3052),
+    12: (5304, 3346),
+    13: (5832, 3668),
+    14: (6408, 4032),
+    15: (7056, 4424),
+    16: (7776, 4858),
+}
+
+
+def get_tower_max_hp(level: int, is_king: bool) -> int:
+    """
+    Get max HP for a tower at a given level.
+
+    Args:
+        level: Tower level (1-16)
+        is_king: True for king tower, False for princess tower
+
+    Returns:
+        Max HP value
+    """
+    king_hp, princess_hp = TOWER_HP.get(level, TOWER_HP[15])
+    return king_hp if is_king else princess_hp
+
+
 # Card elixir costs
-# Maps card names (as detected by Roboflow) to their elixir cost
+# Maps card names (as detected by Roboflow model torchroyale/4) to elixir cost
 ELIXIR_COSTS: Dict[str, int] = {
-    # Hog 2.6 deck
+    # Hog 2.6 deck (player cards)
     "hog-rider": 4,
     "musketeer": 4,
     "ice-golem": 2,
     "ice-spirit": 1,
     "skeletons": 1,
+    "skeleton": 1,
     "cannon": 3,
     "fireball": 4,
     "the-log": 2,
+    "log": 2,
 
-    # Common opponent cards (extend as Roboflow model learns more)
+    # Evolution / hero variants (same cost as base card)
+    "evo-musketeer": 4,
+    "evo-skeletons": 1,
+    "evo-skeleton": 1,
+    "hero-ice-golem": 2,
+    "hero-ice-golem-ability": 0,
+    "hero-musketeer": 4,
+    "hero-musketeer-ability": 0,
+    "hero-wizard": 5,
+
+    # Opponent cards detected by Roboflow model
+    "base-bandit": 3,
+    "boss-bandit": 3,
+    "bowler": 5,
+    "electro-dragon": 5,
+    "electro-giant": 7,
+    "electro-spirit": 1,
+    "fire-spirit": 1,
+    "golden-knight": 4,
+    "mega-knight": 7,
+    "mighty-miner": 4,
+    "mini-pekka": 4,
+    "minion": 3,
+    "royal-ghost": 3,
+    "royal-recruits": 7,
+    "evo-cannon": 3,
+    "evo-royal-ghost": 3,
+    "evo-royal-recruits": 7,
+
+    # Common cards (may appear as opponent detections)
     "knight": 3,
     "archers": 3,
     "minions": 3,
     "valkyrie": 4,
     "wizard": 5,
     "witch": 5,
-    "mini-pekka": 4,
     "pekka": 7,
     "giant": 5,
     "golem": 8,
     "royal-giant": 6,
-    "hog": 4,  # Alternate name
+    "hog": 4,
     "balloon": 5,
     "lava-hound": 7,
     "baby-dragon": 4,
     "electro-wizard": 4,
-    "mega-knight": 7,
     "sparky": 6,
     "prince": 5,
     "dark-prince": 4,
@@ -83,7 +148,6 @@ ELIXIR_COSTS: Dict[str, int] = {
     "battle-ram": 4,
     "ram-rider": 5,
     "bandit": 3,
-    "electro-dragon": 5,
     "inferno-dragon": 4,
     "lumberjack": 4,
     "night-witch": 4,
@@ -116,12 +180,12 @@ def get_elixir_cost(card_name: str) -> int:
     """
     Get elixir cost for a card, handling name variants.
 
-    Strips common prefixes/suffixes like:
+    Strips common prefixes/suffixes from Roboflow detection names:
     - "opponent-" prefix
-    - "-on-field" suffix
+    - "-in-hand", "-next", "-on-field" suffixes
     - "_on_field" suffix
-    - "-evolution" suffix
-    - "_evolution" suffix
+    - "-evolution", "_evolution" suffixes
+    - "-ability" suffix
 
     Args:
         card_name: Card name as detected (may include prefixes/suffixes)
@@ -129,13 +193,11 @@ def get_elixir_cost(card_name: str) -> int:
     Returns:
         Elixir cost (0 if card not found)
     """
-    # Clean the name
     clean_name = card_name.lower()
     clean_name = clean_name.replace("opponent-", "")
-    clean_name = clean_name.replace("-on-field", "")
-    clean_name = clean_name.replace("_on_field", "")
-    clean_name = clean_name.replace("-evolution", "")
-    clean_name = clean_name.replace("_evolution", "")
+    for suffix in ["-in-hand", "-next", "-on-field", "_on_field",
+                   "-evolution", "_evolution", "-ability"]:
+        clean_name = clean_name.replace(suffix, "")
     clean_name = clean_name.strip()
 
     return ELIXIR_COSTS.get(clean_name, 0)

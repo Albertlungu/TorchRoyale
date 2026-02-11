@@ -22,8 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.ocr import DigitDetector
 from src.constants import UIRegions, GamePhase
-from src.game_state import GamePhaseTracker, HealthBarDetector
+from src.game_state import GamePhaseTracker, TowerHealthDetector
 from src.recommendation.elixir_manager import OpponentElixirTracker
+from detection_test import DetectionPipeline
 
 
 def test_screenshot(image_path: str):
@@ -45,7 +46,7 @@ def test_screenshot(image_path: str):
     print("\nInitializing OCR (first run downloads model ~100MB)...")
     detector = DigitDetector()
     regions = UIRegions(w, h)
-    health_detector = HealthBarDetector()
+    health_detector = TowerHealthDetector()
 
     # Test elixir detection
     print("\n--- Elixir Detection ---")
@@ -75,14 +76,58 @@ def test_screenshot(image_path: str):
     mult = detector.detect_multiplier_icon(img, mult_region)
     print(f"Detected multiplier: x{mult}")
 
-    # Test tower health
-    print("\n--- Tower Health ---")
-    tower_regions = regions.get_all_tower_regions()
-    for name, region in tower_regions.items():
-        health = health_detector.detect_health(img, region.to_tuple())
-        status = "DESTROYED" if health.health_percent <= 0 else f"{health.health_percent:.0f}%"
-        bar_status = "visible" if health.bar_visible else "not visible"
-        print(f"  {name}: {status} (bar {bar_status})")
+    # Run Roboflow detection for tower positions
+    print("\n--- Roboflow Detection ---")
+    pipeline = DetectionPipeline()
+    rf_results = pipeline.process_image(image_path)
+    tower_detections = []
+    for det in rf_results["detections"]:
+        if "tower" in det.class_name:
+            tower_det = {
+                "class_name": det.class_name,
+                "pixel_x": det.pixel_x,
+                "pixel_y": det.pixel_y,
+                "pixel_width": det.pixel_width,
+                "pixel_height": det.pixel_height,
+                "is_opponent": det.is_opponent,
+            }
+            tower_detections.append(tower_det)
+            side = "OPP" if det.is_opponent else "YOU"
+            print(f"  {det.class_name} [{side}] @ ({det.pixel_x}, {det.pixel_y}) "
+                  f"size {det.pixel_width}x{det.pixel_height}")
+
+    # Detect tower levels from king towers
+    print("\n--- Tower Level Detection ---")
+    player_level = 15
+    opponent_level = 15
+    for det in tower_detections:
+        if "king" in det["class_name"]:
+            level = health_detector.detect_tower_level(
+                img,
+                det["pixel_x"], det["pixel_y"],
+                det["pixel_width"], det["pixel_height"],
+                det["is_opponent"],
+            )
+            if det["is_opponent"]:
+                opponent_level = level
+                print(f"  Opponent king tower level: {level}")
+            else:
+                player_level = level
+                print(f"  Player king tower level: {level}")
+
+    # Test tower health via OCR
+    print("\n--- Tower Health (OCR) ---")
+    tower_health = health_detector.detect_all_towers(
+        img, tower_detections,
+        player_level=player_level,
+        opponent_level=opponent_level,
+    )
+    for name, th in tower_health.items():
+        if th.detected:
+            print(f"  {name}: {th.hp_current}/{th.hp_max} ({th.health_percent:.1f}%) "
+                  f"raw='{th.raw_text}'")
+        else:
+            print(f"  {name}: FULL HP ({th.hp_max} max)")
 
     # Save debug image with regions drawn
     debug_img = img.copy()
@@ -102,20 +147,22 @@ def test_screenshot(image_path: str):
     cv2.rectangle(debug_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.putText(debug_img, "Mult", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-    # Draw tower health bar regions (cyan for player, magenta for opponent)
-    tower_colors = {
-        "player_king": (255, 255, 0),    # cyan
-        "player_left": (255, 255, 0),    # cyan
-        "player_right": (255, 255, 0),   # cyan
-        "opponent_king": (255, 0, 255),  # magenta
-        "opponent_left": (255, 0, 255),  # magenta
-        "opponent_right": (255, 0, 255), # magenta
-    }
-    for name, region in tower_regions.items():
-        x1, y1, x2, y2 = region.to_tuple()
-        color = tower_colors[name]
-        cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(debug_img, name, (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+    # Draw tower HP search regions (cyan for player, magenta for opponent)
+    for det in tower_detections:
+        is_opp = det["is_opponent"]
+        is_king = "king" in det["class_name"]
+        color = (255, 0, 255) if is_opp else (255, 255, 0)
+        hp_region = health_detector.get_hp_region(
+            det["pixel_x"], det["pixel_y"],
+            det["pixel_width"], det["pixel_height"],
+            is_opp, w, h, is_king=is_king,
+        )
+        if hp_region:
+            x1, y1, x2, y2 = hp_region
+            cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
+            label = f"{'opp' if is_opp else 'you'}-{det['class_name']}"
+            cv2.putText(debug_img, label, (x1, y1-5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
     # Save debug image
     output_path = Path(image_path).stem + "_debug.png"

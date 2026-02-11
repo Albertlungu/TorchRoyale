@@ -7,3 +7,5 @@ roboflow>=1.1.0
 inference>=0.9.0
 supervision>=0.16.0
 easyocr>=1.7.0
+
+mss

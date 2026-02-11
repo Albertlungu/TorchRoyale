@@ -5,7 +5,9 @@ from .game_constants import (
     ElixirConstants,
     GameTimingConstants,
     ELIXIR_COSTS,
+    TOWER_HP,
     get_elixir_cost,
+    get_tower_max_hp,
     get_regen_rate,
 )
 from .ui_regions import UIRegion, UIRegions
@@ -15,7 +17,9 @@ __all__ = [
     "ElixirConstants",
     "GameTimingConstants",
     "ELIXIR_COSTS",
+    "TOWER_HP",
     "get_elixir_cost",
+    "get_tower_max_hp",
     "get_regen_rate",
     "UIRegion",
     "UIRegions",
