@@ -1,2 +1,2 @@
-tests/videos/ filter=lfs diff=lfs merge=lfs -text
+tests/videos/* filter=lfs diff=lfs merge=lfs -text
 tests/videos/*.MP4 filter=lfs diff=lfs merge=lfs -text
