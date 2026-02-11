@@ -211,5 +211,8 @@ __marimo__/
 
 
 
+# Debug output
+debug/
+
 # Private
 private
