@@ -102,6 +102,21 @@ def test_screenshot(image_path: str):
     cv2.rectangle(debug_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
     cv2.putText(debug_img, "Mult", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
+    # Draw tower health bar regions (cyan for player, magenta for opponent)
+    tower_colors = {
+        "player_king": (255, 255, 0),    # cyan
+        "player_left": (255, 255, 0),    # cyan
+        "player_right": (255, 255, 0),   # cyan
+        "opponent_king": (255, 0, 255),  # magenta
+        "opponent_left": (255, 0, 255),  # magenta
+        "opponent_right": (255, 0, 255), # magenta
+    }
+    for name, region in tower_regions.items():
+        x1, y1, x2, y2 = region.to_tuple()
+        color = tower_colors[name]
+        cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(debug_img, name, (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
     # Save debug image
     output_path = Path(image_path).stem + "_debug.png"
     cv2.imwrite(output_path, debug_img)

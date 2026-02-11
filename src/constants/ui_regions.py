@@ -84,18 +84,18 @@ class UIRegions:
 
         # Timer region (top center-right, shows MM:SS)
         self.timer = UIRegion(
-            x_min=int(w * 0.40),
-            y_min=int(h * 0.015),
-            x_max=int(w * 0.60),
-            y_max=int(h * 0.045),
+            x_min=int(w * 0.87),
+            y_min=int(h * 0.075),
+            x_max=int(w * 0.97),
+            y_max=int(h * 0.1),
         )
 
         # Multiplier icon region (x2/x3 indicator, appears top center)
         self.multiplier_icon = UIRegion(
-            x_min=int(w * 0.42),
-            y_min=int(h * 0.045),
-            x_max=int(w * 0.58),
-            y_max=int(h * 0.08),
+            x_min=int(w * 0.88),
+            y_min=int(h * 0.125),
+            x_max=int(w * 0.96),
+            y_max=int(h * 0.155),
         )
 
         # ============================================
@@ -113,7 +113,7 @@ class UIRegions:
         # Elixir number display (shows current elixir count 0-10)
         # Located at the left end of the elixir bar
         self.elixir_number = UIRegion(
-            x_min=int(w * 0.28),
+            x_min=int(w * 0.27),
             y_min=int(h * 0.940),
             x_max=int(w * 0.32),
             y_max=int(h * 0.965),
@@ -167,10 +167,10 @@ class UIRegions:
 
         # Player towers (bottom half of arena)
         self.player_king_tower = UIRegion(
-            x_min=int(w * 0.35),
-            y_min=int(h * 0.70),
-            x_max=int(w * 0.65),
-            y_max=int(h * 0.73),
+            x_min=int(w * 0.45),
+            y_min=int(h * 0.75),
+            x_max=int(w * 0.55),
+            y_max=int(h * 0.77),
         )
 
         self.player_left_tower = UIRegion(
@@ -189,10 +189,10 @@ class UIRegions:
 
         # Opponent towers (top half of arena)
         self.opponent_king_tower = UIRegion(
-            x_min=int(w * 0.35),
-            y_min=int(h * 0.14),
-            x_max=int(w * 0.65),
-            y_max=int(h * 0.17),
+            x_min=int(w * 0.45),
+            y_min=int(h * 0.08),
+            x_max=int(w * 0.55),
+            y_max=int(h * 0.10),
         )
 
         self.opponent_left_tower = UIRegion(

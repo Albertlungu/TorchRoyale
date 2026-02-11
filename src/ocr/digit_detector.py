@@ -5,8 +5,6 @@ Uses EasyOCR for reliable detection of:
 - Elixir count (0-10)
 - Timer (MM:SS format)
 - Card costs
-
-Uses color-based detection for:
 - Multiplier icons (x2/x3)
 """
 
@@ -252,9 +250,9 @@ class DigitDetector:
         """
         Detect x2 or x3 elixir multiplier icon.
 
-        Uses color-based detection since icons are colored distinctly:
-        - x2 icon: golden/yellow
-        - x3 icon: purple/pink
+        Both x2 and x3 icons have a purple background with a white digit,
+        so we use OCR to read the digit. If no purple background is present,
+        there is no multiplier icon (single elixir).
 
         Args:
             image: Full frame (BGR format)
@@ -269,33 +267,40 @@ class DigitDetector:
         if roi.size == 0:
             return 1
 
-        # Convert to HSV for color detection
+        # Check for purple background to see if icon is present
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-        # x2 icon color ranges (golden/yellow)
-        yellow_lower = np.array([15, 100, 100])
-        yellow_upper = np.array([35, 255, 255])
-
-        # x3 icon color ranges (purple/magenta)
-        purple_lower = np.array([140, 100, 100])
+        purple_lower = np.array([120, 50, 50])
         purple_upper = np.array([170, 255, 255])
-
-        # Count colored pixels
-        yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
         purple_mask = cv2.inRange(hsv, purple_lower, purple_upper)
-
-        yellow_pixels = cv2.countNonZero(yellow_mask)
         purple_pixels = cv2.countNonZero(purple_mask)
+        threshold = roi.shape[0] * roi.shape[1] * 0.05
 
-        # Threshold for considering icon present
-        threshold = roi.shape[0] * roi.shape[1] * 0.05  # 5% of region
+        if purple_pixels < threshold:
+            return 1  # No multiplier icon present
 
-        if purple_pixels > threshold and purple_pixels > yellow_pixels:
-            return 3  # Triple elixir
-        elif yellow_pixels > threshold:
-            return 2  # Double elixir
+        # Icon is present -- use OCR to read the digit (2 or 3)
+        # Crop to right half to skip the "x" prefix which confuses OCR
+        processed = self._preprocess_for_ocr(roi)
+        right_half = processed[:, processed.shape[1] // 2:]
+        try:
+            results = self.reader.readtext(
+                right_half,
+                allowlist='0123456789',
+                paragraph=False,
+                min_size=5,
+            )
+        except Exception:
+            return 2  # Default to x2 if OCR fails but icon is present
 
-        return 1  # Single elixir (no icon)
+        if results:
+            best = max(results, key=lambda x: x[2])
+            text = best[1].strip()
+            # Take last digit in case of OCR artifacts
+            for ch in reversed(text):
+                if ch in '23':
+                    return int(ch)
+
+        return 2  # Purple icon present but digit unclear, default x2
 
     def detect_card_cost(
         self,
@@ -359,11 +364,15 @@ class DigitDetector:
         """
         Preprocess image region for better OCR results.
 
+        Text in Clash Royale UI is near-white on darker backgrounds,
+        so we isolate bright pixels with a simple threshold. EasyOCR
+        handles white-on-dark text well, so no inversion is needed.
+
         Args:
             roi: Region of interest (BGR format)
 
         Returns:
-            Preprocessed image
+            Preprocessed image (white text on black background)
         """
         # Convert to grayscale
         if len(roi.shape) == 3:
@@ -371,11 +380,8 @@ class DigitDetector:
         else:
             gray = roi
 
-        # Increase contrast
-        gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
-
-        # Resize if too small (OCR works better on larger images)
-        min_height = 32
+        # Scale up for reliable OCR
+        min_height = 128
         if gray.shape[0] < min_height:
             scale = min_height / gray.shape[0]
             gray = cv2.resize(
@@ -386,15 +392,8 @@ class DigitDetector:
                 interpolation=cv2.INTER_CUBIC
             )
 
-        # Apply adaptive thresholding for cleaner text
-        binary = cv2.adaptiveThreshold(
-            gray,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            11,
-            2
-        )
+        # Threshold to isolate bright (near-white) text
+        _, binary = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
 
         return binary
 

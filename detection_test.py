@@ -28,11 +28,11 @@ import numpy as np
 import supervision as sv
 from inference import get_model
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
 
-from grid.coordinate_mapper import CoordinateMapper, ArenaBounds, print_grid
-from grid.validity_masks import PlacementValidator, CARD_TYPES, ON_FIELD_CARDS
+from src.grid.coordinate_mapper import CoordinateMapper, ArenaBounds, print_grid
+from src.grid.validity_masks import PlacementValidator, CARD_TYPES, ON_FIELD_CARDS
 
 
 # Configuration
