@@ -48,7 +48,7 @@ class DigitDetector:
             preload_ocr: If True, load OCR model immediately.
                         If False (default), load on first use.
         """
-        self._reader = None
+        self.reader = None
         if preload_ocr:
             self._initialize_reader()
     
