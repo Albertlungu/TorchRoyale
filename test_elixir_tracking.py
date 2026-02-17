@@ -15,27 +15,47 @@ Usage:
 Debug output is saved to debug/screenshots/ and debug/videos/<run_name>/
 """
 
+import os
 import sys
-import cv2
 from datetime import datetime
 from pathlib import Path
+
+import cv2
+
+# Suppress optional model dependency warnings
+os.environ.setdefault("QWEN_2_5_ENABLED", "False")
+os.environ.setdefault("QWEN_3_ENABLED", "False")
+os.environ.setdefault("CORE_MODEL_SAM_ENABLED", "False")
+os.environ.setdefault("CORE_MODEL_SAM3_ENABLED", "False")
+os.environ.setdefault("CORE_MODEL_GAZE_ENABLED", "False")
+os.environ.setdefault("CORE_MODEL_YOLO_WORLD_ENABLED", "False")
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.ocr import DigitDetector
-from src.constants import UIRegions, GamePhase
-from src.game_state import GamePhaseTracker, TowerHealthDetector
-from src.recommendation.elixir_manager import OpponentElixirTracker
 from detection_test import DetectionPipeline
+from src.constants import UIRegions
+from src.game_state import GamePhaseTracker, TowerHealthDetector
+from src.ocr import DigitDetector
+from src.recommendation.elixir_manager import OpponentElixirTracker
 
 # Debug output root
 DEBUG_DIR = Path("debug")
 
 
-def _draw_annotated_frame(frame, mapper, all_detections, tower_detections,
-                          health_detector, tower_health, elixir_result,
-                          timer, mult, w, h):
+def _draw_annotated_frame(
+    frame,
+    mapper,
+    all_detections,
+    tower_detections,
+    health_detector,
+    tower_health,
+    elixir_result,
+    timer,
+    mult,
+    w,
+    h,
+):
     """Draw all debug overlays on a frame and return the annotated image."""
     debug_img = frame.copy()
 
@@ -43,14 +63,22 @@ def _draw_annotated_frame(frame, mapper, all_detections, tower_detections,
     overlay = debug_img.copy()
     for gx in range(mapper.GRID_WIDTH + 1):
         px = int(gx * mapper.tile_width + mapper.bounds.x_min)
-        cv2.line(overlay,
-                 (px, mapper.bounds.y_min), (px, mapper.bounds.y_max),
-                 (0, 255, 0), 2)
+        cv2.line(
+            overlay,
+            (px, mapper.bounds.y_min),
+            (px, mapper.bounds.y_max),
+            (0, 255, 0),
+            2,
+        )
     for gy in range(mapper.GRID_HEIGHT + 1):
         py = int(gy * mapper.tile_height + mapper.bounds.y_min)
-        cv2.line(overlay,
-                 (mapper.bounds.x_min, py), (mapper.bounds.x_max, py),
-                 (0, 255, 0), 2)
+        cv2.line(
+            overlay,
+            (mapper.bounds.x_min, py),
+            (mapper.bounds.x_max, py),
+            (0, 255, 0),
+            2,
+        )
     debug_img = cv2.addWeighted(overlay, 0.5, debug_img, 0.5, 0)
 
     # Draw all Roboflow detection bounding boxes
@@ -62,8 +90,9 @@ def _draw_annotated_frame(frame, mapper, all_detections, tower_detections,
         color = (0, 100, 255) if det.is_opponent else (255, 200, 0)
         cv2.rectangle(debug_img, (bx1, by1), (bx2, by2), color, 2)
         label = f"{det.class_name} ({det.tile_x},{det.tile_y})"
-        cv2.putText(debug_img, label, (bx1, by1 - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1)
+        cv2.putText(
+            debug_img, label, (bx1, by1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1
+        )
 
     # Draw tower HP search regions (cyan for player, magenta for opponent)
     for det in tower_detections:
@@ -71,23 +100,37 @@ def _draw_annotated_frame(frame, mapper, all_detections, tower_detections,
         is_king = "king" in det["class_name"]
         color = (255, 0, 255) if is_opp else (255, 255, 0)
         hp_region = health_detector.get_hp_region(
-            det["pixel_x"], det["pixel_y"],
-            det["pixel_width"], det["pixel_height"],
-            is_opp, w, h, is_king=is_king,
+            det["pixel_x"],
+            det["pixel_y"],
+            det["pixel_width"],
+            det["pixel_height"],
+            is_opp,
+            w,
+            h,
+            is_king=is_king,
         )
         if hp_region:
             x1, y1, x2, y2 = hp_region
             cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
-            label = f"HP:{'opp' if is_opp else 'you'}-{'king' if is_king else 'princess'}"
-            cv2.putText(debug_img, label, (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+            label = (
+                f"HP:{'opp' if is_opp else 'you'}-{'king' if is_king else 'princess'}"
+            )
+            cv2.putText(
+                debug_img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1
+            )
 
     # Draw summary text overlay
     info_lines = [
         f"Elixir: {elixir_result.value}  Timer: {timer}s  Mult: x{mult}",
     ]
-    for name in ["player_left", "player_king", "player_right",
-                 "opponent_left", "opponent_king", "opponent_right"]:
+    for name in [
+        "player_left",
+        "player_king",
+        "player_right",
+        "opponent_left",
+        "opponent_king",
+        "opponent_right",
+    ]:
         th = tower_health.get(name)
         if th is None:
             info_lines.append(f"{name}: ?")
@@ -102,19 +145,27 @@ def _draw_annotated_frame(frame, mapper, all_detections, tower_detections,
 
     for i, line in enumerate(info_lines):
         y_pos = 30 + i * 25
-        cv2.putText(debug_img, line, (10, y_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
-        cv2.putText(debug_img, line, (10, y_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(
+            debug_img, line, (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3
+        )
+        cv2.putText(
+            debug_img,
+            line,
+            (10, y_pos),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
 
     return debug_img
 
 
 def test_screenshot(image_path: str):
     """Test detection on a single screenshot."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing on: {image_path}")
-    print('='*60)
+    print("=" * 60)
 
     # Load image
     img = cv2.imread(image_path)
@@ -173,27 +224,33 @@ def test_screenshot(image_path: str):
     for det in all_detections:
         side = "OPP" if det.is_opponent else "YOU"
         status = "field" if det.is_on_field else "hand"
-        print(f"  {det.class_name:25s} [{side}] tile=({det.tile_x:2d},{det.tile_y:2d}) "
-              f"pixel=({det.pixel_x:4d},{det.pixel_y:4d}) "
-              f"conf={det.confidence:.2f} [{status}]")
+        print(
+            f"  {det.class_name:25s} [{side}] tile=({det.tile_x:2d},{det.tile_y:2d}) "
+            f"pixel=({det.pixel_x:4d},{det.pixel_y:4d}) "
+            f"conf={det.confidence:.2f} [{status}]"
+        )
 
         if "tower" in det.class_name:
-            tower_detections.append({
-                "class_name": det.class_name,
-                "pixel_x": det.pixel_x,
-                "pixel_y": det.pixel_y,
-                "pixel_width": det.pixel_width,
-                "pixel_height": det.pixel_height,
-                "is_opponent": det.is_opponent,
-            })
+            tower_detections.append(
+                {
+                    "class_name": det.class_name,
+                    "pixel_x": det.pixel_x,
+                    "pixel_y": det.pixel_y,
+                    "pixel_width": det.pixel_width,
+                    "pixel_height": det.pixel_height,
+                    "is_opponent": det.is_opponent,
+                }
+            )
         elif det.is_opponent:
             opponent_cards.append(det)
         else:
             friendly_cards.append(det)
 
-    print(f"\n  Summary: {len(all_detections)} total "
-          f"({len(tower_detections)} towers, {len(friendly_cards)} friendly, "
-          f"{len(opponent_cards)} opponent)")
+    print(
+        f"\n  Summary: {len(all_detections)} total "
+        f"({len(tower_detections)} towers, {len(friendly_cards)} friendly, "
+        f"{len(opponent_cards)} opponent)"
+    )
 
     # Detect tower levels from king towers
     print("\n--- Tower Level Detection ---")
@@ -203,8 +260,10 @@ def test_screenshot(image_path: str):
         if "king" in det["class_name"]:
             level = health_detector.detect_tower_level(
                 img,
-                det["pixel_x"], det["pixel_y"],
-                det["pixel_width"], det["pixel_height"],
+                det["pixel_x"],
+                det["pixel_y"],
+                det["pixel_width"],
+                det["pixel_height"],
                 det["is_opponent"],
             )
             if det["is_opponent"]:
@@ -217,7 +276,8 @@ def test_screenshot(image_path: str):
     # Test tower health via OCR
     print("\n--- Tower Health (OCR) ---")
     tower_health = health_detector.detect_all_towers(
-        img, tower_detections,
+        img,
+        tower_detections,
         player_level=player_level,
         opponent_level=opponent_level,
     )
@@ -225,8 +285,10 @@ def test_screenshot(image_path: str):
         if th.is_destroyed:
             print(f"  {name}: DESTROYED (0/{th.hp_max})")
         elif th.detected:
-            print(f"  {name}: {th.hp_current}/{th.hp_max} ({th.health_percent:.1f}%) "
-                  f"raw='{th.raw_text}'")
+            print(
+                f"  {name}: {th.hp_current}/{th.hp_max} ({th.health_percent:.1f}%) "
+                f"raw='{th.raw_text}'"
+            )
         elif th.health_percent == 100.0:
             print(f"  {name}: FULL HP ({th.hp_max} max)")
         else:
@@ -237,8 +299,17 @@ def test_screenshot(image_path: str):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     debug_img = _draw_annotated_frame(
-        img, mapper, all_detections, tower_detections,
-        health_detector, tower_health, result, timer, mult, w, h,
+        img,
+        mapper,
+        all_detections,
+        tower_detections,
+        health_detector,
+        tower_health,
+        result,
+        timer,
+        mult,
+        w,
+        h,
     )
 
     # Also draw OCR regions: elixir (green), timer (blue), multiplier (red)
@@ -249,8 +320,9 @@ def test_screenshot(image_path: str):
     ]:
         x1, y1, x2, y2 = region
         cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(debug_img, label, (x1, y1 - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        cv2.putText(
+            debug_img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+        )
 
     output_path = out_dir / f"{Path(image_path).stem}_debug.png"
     cv2.imwrite(str(output_path), debug_img)
@@ -260,9 +332,9 @@ def test_screenshot(image_path: str):
 
 def test_video(video_path: str, full: bool = False):
     """Test full pipeline on a video file."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing on video: {video_path}")
-    print('='*60)
+    print("=" * 60)
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -306,7 +378,9 @@ def test_video(video_path: str, full: bool = False):
     # Save a debug frame every ~1 second
     save_interval = max(1, int(fps / frame_skip))
 
-    print(f"\nProcessing {'all' if full else 'first 10 seconds of'} frames (every {frame_skip}th)...")
+    print(
+        f"\nProcessing {'all' if full else 'first 10 seconds of'} frames (every {frame_skip}th)..."
+    )
     print(f"Saving annotated frame every ~1s to {frames_dir}/")
     print("-" * 100)
 
@@ -333,9 +407,7 @@ def test_video(video_path: str, full: bool = False):
             )
 
             # Detect timer
-            timer = detector.detect_timer(
-                frame, regions.timer.to_tuple()
-            )
+            timer = detector.detect_timer(frame, regions.timer.to_tuple())
 
             # Update phase tracker
             phase = phase_tracker.update(multiplier_detected=mult)
@@ -354,14 +426,16 @@ def test_video(video_path: str, full: bool = False):
             opponent_on_field = []
             for det in all_dets:
                 if "tower" in det.class_name:
-                    tower_dets.append({
-                        "class_name": det.class_name,
-                        "pixel_x": det.pixel_x,
-                        "pixel_y": det.pixel_y,
-                        "pixel_width": det.pixel_width,
-                        "pixel_height": det.pixel_height,
-                        "is_opponent": det.is_opponent,
-                    })
+                    tower_dets.append(
+                        {
+                            "class_name": det.class_name,
+                            "pixel_x": det.pixel_x,
+                            "pixel_y": det.pixel_y,
+                            "pixel_width": det.pixel_width,
+                            "pixel_height": det.pixel_height,
+                            "is_opponent": det.is_opponent,
+                        }
+                    )
                 if det.is_opponent and det.is_on_field:
                     opponent_on_field.append(det)
 
@@ -371,8 +445,10 @@ def test_video(video_path: str, full: bool = False):
                     if "king" in td["class_name"]:
                         level = health_detector.detect_tower_level(
                             frame,
-                            td["pixel_x"], td["pixel_y"],
-                            td["pixel_width"], td["pixel_height"],
+                            td["pixel_x"],
+                            td["pixel_y"],
+                            td["pixel_width"],
+                            td["pixel_height"],
                             td["is_opponent"],
                         )
                         if td["is_opponent"]:
@@ -385,7 +461,8 @@ def test_video(video_path: str, full: bool = False):
             tower_health = {}
             if tower_dets:
                 tower_health = health_detector.detect_all_towers(
-                    frame, tower_dets,
+                    frame,
+                    tower_dets,
                     player_level=player_level,
                     opponent_level=opponent_level,
                 )
@@ -401,17 +478,23 @@ def test_video(video_path: str, full: bool = False):
             opp_elixir = opponent_tracker.update(
                 timestamp_ms=timestamp_ms,
                 game_phase=phase,
-                opponent_detections=opponent_on_field
+                opponent_detections=opponent_on_field,
             )
 
             # Print + save every ~1 second
             if processed % save_interval == 0:
-                time_str = f"{timestamp_ms/1000:.1f}s"
+                time_str = f"{timestamp_ms / 1000:.1f}s"
 
                 # Build tower HP summary
                 tower_strs = []
-                for name in ["player_left", "player_king", "player_right",
-                             "opponent_left", "opponent_king", "opponent_right"]:
+                for name in [
+                    "player_left",
+                    "player_king",
+                    "player_right",
+                    "opponent_left",
+                    "opponent_king",
+                    "opponent_right",
+                ]:
                     th = tower_health.get(name)
                     if th is None:
                         tower_strs.append(f"{name}: ?")
@@ -420,7 +503,11 @@ def test_video(video_path: str, full: bool = False):
                     elif th.detected:
                         tower_strs.append(f"{name}: {th.hp_current}")
                     else:
-                        tower_strs.append(f"{name}: FULL" if th.health_percent == 100.0 else f"{name}: ?")
+                        tower_strs.append(
+                            f"{name}: FULL"
+                            if th.health_percent == 100.0
+                            else f"{name}: ?"
+                        )
 
                 print(
                     f"Time: {time_str:>6} | "
@@ -433,11 +520,21 @@ def test_video(video_path: str, full: bool = False):
                 # Save annotated debug frame
                 if mapper is not None:
                     debug_frame = _draw_annotated_frame(
-                        frame, mapper, all_dets, tower_dets,
-                        health_detector, tower_health,
-                        elixir_result, timer, mult, width, height,
+                        frame,
+                        mapper,
+                        all_dets,
+                        tower_dets,
+                        health_detector,
+                        tower_health,
+                        elixir_result,
+                        timer,
+                        mult,
+                        width,
+                        height,
                     )
-                    frame_path = frames_dir / f"frame_{frame_num:06d}_{timestamp_ms}ms.png"
+                    frame_path = (
+                        frames_dir / f"frame_{frame_num:06d}_{timestamp_ms}ms.png"
+                    )
                     cv2.imwrite(str(frame_path), debug_frame)
 
             processed += 1

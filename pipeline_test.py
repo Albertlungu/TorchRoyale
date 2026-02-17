@@ -163,10 +163,12 @@ def _draw_annotated_frame(
     return debug_img
 
 
-def test_screenshot(image_path: str):
+def test_screenshot(image_path: str, save_debug: bool = True):
     """Test detection on a single screenshot with full debug output."""
     print(f"\n{'=' * 60}")
     print(f"Testing screenshot: {image_path}")
+    if not save_debug:
+        print("Debug image saving: DISABLED")
     print("=" * 60)
 
     # Load image
@@ -262,44 +264,49 @@ def test_screenshot(image_path: str):
             print(f"  {name}: OCR FAILED raw='{th.raw_text}'")
 
     # Save debug image
-    out_dir = DEBUG_DIR / "screenshots"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if save_debug:
+        out_dir = DEBUG_DIR / "screenshots"
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-    debug_img = _draw_annotated_frame(
-        img,
-        mapper,
-        all_detections,
-        tower_detections,
-        health_detector,
-        tower_health,
-        elixir_result,
-        timer,
-        mult,
-        w,
-        h,
-    )
-
-    # Draw OCR regions
-    for region, label, color in [
-        (elixir_region, "Elixir", (0, 255, 0)),
-        (timer_region, "Timer", (255, 0, 0)),
-        (mult_region, "Mult", (0, 0, 255)),
-    ]:
-        x1, y1, x2, y2 = region
-        cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(
-            debug_img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+        debug_img = _draw_annotated_frame(
+            img,
+            mapper,
+            all_detections,
+            tower_detections,
+            health_detector,
+            tower_health,
+            elixir_result,
+            timer,
+            mult,
+            w,
+            h,
         )
 
-    output_path = out_dir / f"{Path(image_path).stem}_debug.png"
-    cv2.imwrite(str(output_path), debug_img)
-    print(f"\nDebug image saved: {output_path}")
+        # Draw OCR regions
+        for region, label, color in [
+            (elixir_region, "Elixir", (0, 255, 0)),
+            (timer_region, "Timer", (255, 0, 0)),
+            (mult_region, "Mult", (0, 0, 255)),
+        ]:
+            x1, y1, x2, y2 = region
+            cv2.rectangle(debug_img, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(
+                debug_img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+            )
+
+        output_path = out_dir / f"{Path(image_path).stem}_debug.png"
+        cv2.imwrite(str(output_path), debug_img)
+        print(f"\nDebug image saved: {output_path}")
+    else:
+        print("\nDebug image saving skipped (--no-debug mode)")
 
 
-def test_video(video_path: str, full: bool = False):
+def test_video(video_path: str, full: bool = False, save_debug: bool = True):
     """Test full pipeline on a video with comprehensive debug output."""
     print(f"\n{'=' * 60}")
     print(f"Testing video: {video_path}")
+    if not save_debug:
+        print("Debug image saving: DISABLED (performance mode)")
     print("=" * 60)
 
     cap = cv2.VideoCapture(video_path)
@@ -316,12 +323,15 @@ def test_video(video_path: str, full: bool = False):
     print(f"Video: {width}x{height}, {fps:.1f} FPS, {duration:.1f}s")
 
     # Create debug output directory
-    video_name = Path(video_path).stem
-    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = DEBUG_DIR / "videos" / f"{video_name}_{run_timestamp}"
-    frames_dir = run_dir / "frames"
-    frames_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Debug output: {run_dir}/")
+    if save_debug:
+        video_name = Path(video_path).stem
+        run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = DEBUG_DIR / "videos" / f"{video_name}_{run_timestamp}"
+        frames_dir = run_dir / "frames"
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Debug output: {run_dir}/")
+    else:
+        run_dir = frames_dir = None
 
     # Initialize components
     print("\nInitializing components...")
@@ -335,12 +345,15 @@ def test_video(video_path: str, full: bool = False):
     # Processing parameters - prioritize accuracy over speed
     frame_skip = 3  # Process every 3rd frame for thorough testing
     max_frames = total_frames if full else int(fps * 5)  # 5 seconds unless --full
-    save_interval = max(1, int(fps / frame_skip))  # Save ~1 frame per second
+    save_interval = max(1, int(fps / frame_skip) // 2)  # Save ~2 frames per second
 
     print(
         f"\nProcessing {'all' if full else 'first 5 seconds of'} frames (every {frame_skip}th)..."
     )
-    print(f"Saving debug frames every ~1 second to {frames_dir}/")
+    if save_debug:
+        print(f"Saving debug frames every ~0.5 seconds to {frames_dir}/")
+    else:
+        print("Debug frame saving: DISABLED (performance mode)")
     print("-" * 100)
 
     frame_num = 0
@@ -462,8 +475,8 @@ def test_video(video_path: str, full: bool = False):
                 f"Process: {frame_processing_time * 1000:.1f}ms"
             )
 
-            # Save debug frame only at save_interval (~1 per second)
-            if mapper is not None and processed % save_interval == 0:
+            # Save debug frame only at save_interval (~2 per second)
+            if save_debug and mapper is not None and processed % save_interval == 0:
                 debug_frame = _draw_annotated_frame(
                     frame,
                     mapper,
@@ -501,26 +514,35 @@ def test_video(video_path: str, full: bool = False):
         if avg_processing_time > 0
         else "N/A"
     )
-    print(f"Debug frames saved to: {frames_dir}/")
+    print(
+        f"Debug frames saved to: {frames_dir}/"
+        if save_debug and frames_dir
+        else "Debug frame saving was disabled"
+    )
     print(f"Tower levels - Player: {player_level}, Opponent: {opponent_level}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage:")
-        print("  python pipeline_test.py screenshot <image_path>")
-        print("  python pipeline_test.py video <video_path>")
-        print("  python pipeline_test.py video <video_path> --full")
+        print("  python pipeline_test.py screenshot <image_path> [--no-debug]")
+        print("  python pipeline_test.py video <video_path> [--full] [--no-debug]")
+        print("")
+        print("Flags:")
+        print("  --full      Process entire video (default: first 5 seconds)")
+        print("  --no-debug  Skip debug image generation (faster performance)")
         sys.exit(1)
 
     mode = sys.argv[1]
     path = sys.argv[2]
 
+    # Parse flags
+    args = sys.argv[3:]
+    full = "--full" in args
+    no_debug = "--no-debug" in args
+    save_debug = not no_debug
+
     if mode == "screenshot":
-        test_screenshot(path)
+        test_screenshot(path, save_debug=save_debug)
     elif mode == "video":
-        full = len(sys.argv) > 3 and sys.argv[3] == "--full"
-        test_video(path, full=full)
-    else:
-        print(f"Unknown mode: {mode}")
-        sys.exit(1)
+        test_video(path, full=full, save_debug=save_debug)
