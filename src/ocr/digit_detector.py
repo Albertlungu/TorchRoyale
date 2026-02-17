@@ -68,6 +68,12 @@ class DigitDetector:
         if self._reader is None:
             self._initialize_reader()
         return self._reader
+    @reader.setter
+    def reader(self, value):
+        """
+        The setter for reader variable weak private. 
+        """
+        self._reader = value
 
     def detect_elixir(
         self,
