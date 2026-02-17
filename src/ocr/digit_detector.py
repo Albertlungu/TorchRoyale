@@ -18,21 +18,6 @@ import re
 _ocr_reader = None
 
 
-def _get_ocr_reader():
-    """Get or create the EasyOCR reader (singleton)."""
-    global _ocr_reader
-    if _ocr_reader is None:
-        import easyocr
-        # Use GPU if available, only load English, disable verbose output
-        _ocr_reader = easyocr.Reader(
-            ['en'],
-            gpu=True,
-            verbose=False,
-            quantize=True,  # Use quantized model for faster inference
-        )
-    return _ocr_reader
-
-
 @dataclass
 class DetectionResult:
     """Result of a detection operation."""
@@ -65,13 +50,23 @@ class DigitDetector:
         """
         self._reader = None
         if preload_ocr:
-            self._reader = _get_ocr_reader()
+            self._initialize_reader()
+    
+    def _initialize_reader(self):
+        """Private helper to initialize the EasyOCR reader instance."""
+        import easyocr
+        self._reader = easyocr.Reader(
+            ['en'],
+            gpu=True,
+            verbose=False,
+            quantize=True,
+        )
 
     @property
     def reader(self):
-        """Lazy-load the OCR reader."""
+        """Lazy-load getter for the OCR reader."""
         if self._reader is None:
-            self._reader = _get_ocr_reader()
+            self._initialize_reader()
         return self._reader
 
     def detect_elixir(
