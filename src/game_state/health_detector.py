@@ -46,15 +46,30 @@ class TowerHealthDetector:
     Uses Roboflow tower detections to locate towers, then runs OCR
     on the HP text region relative to each tower's bounding box.
 
+    Supports two backends:
+        - "easyocr" (default): Uses DigitDetector with EasyOCR
+        - "moondream": Uses VisionDetector with Moondream2 VLM
+
     Usage:
         detector = TowerHealthDetector()
         results = detector.detect_all_towers(image, tower_detections, level=15)
     """
 
-    def __init__(self):
-        """Initialize the tower health detector."""
-        from ..ocr.digit_detector import DigitDetector
-        self._digit_detector = DigitDetector()
+    def __init__(self, backend: str = "easyocr", device: str = "auto"):
+        """
+        Initialize the tower health detector.
+
+        Args:
+            backend: "easyocr" or "moondream"
+            device: Device for moondream backend ("auto", "cuda", "cpu", "mps")
+        """
+        self._backend = backend
+        if backend == "moondream":
+            from ..ocr.vision_detector import VisionDetector
+            self._digit_detector = VisionDetector(device=device)
+        else:
+            from ..ocr.digit_detector import DigitDetector
+            self._digit_detector = DigitDetector()
 
     def detect_tower_hp(
         self,
@@ -120,7 +135,11 @@ class TowerHealthDetector:
                     health_percent=None, detected=False
                 )
 
-        # Preprocess and run OCR
+        # Use Moondream VLM path if available
+        if self._backend == "moondream":
+            return self._detect_hp_moondream(image, hp_region, hp_max, is_king)
+
+        # EasyOCR path
         processed = self._digit_detector._preprocess_for_ocr(roi)
         try:
             results = self._digit_detector.reader.readtext(
@@ -181,6 +200,33 @@ class TowerHealthDetector:
                 health_percent=None, detected=False,
                 raw_text=all_text
             )
+
+    def _detect_hp_moondream(
+        self,
+        image: np.ndarray,
+        hp_region: Tuple[int, int, int, int],
+        hp_max: int,
+        is_king: bool,
+    ) -> TowerHealthResult:
+        """Moondream-based HP detection path."""
+        hp_value = self._digit_detector.detect_hp(image, hp_region, hp_max)
+
+        if hp_value is not None:
+            health_pct = min(100.0, (hp_value / hp_max) * 100)
+            return TowerHealthResult(
+                hp_current=hp_value, hp_max=hp_max,
+                health_percent=health_pct, detected=True,
+            )
+
+        if is_king:
+            return TowerHealthResult(
+                hp_current=None, hp_max=hp_max,
+                health_percent=100.0, detected=False,
+            )
+        return TowerHealthResult(
+            hp_current=None, hp_max=hp_max,
+            health_percent=None, detected=False,
+        )
 
     def _get_hp_region(
         self,

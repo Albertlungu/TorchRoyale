@@ -216,3 +216,5 @@ debug/
 
 # Private
 private
+data/replays
+.claude

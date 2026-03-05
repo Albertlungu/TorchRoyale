@@ -343,8 +343,10 @@ def test_video(video_path: str, full: bool = False, save_debug: bool = True):
     pipeline = DetectionPipeline()
 
     # Processing parameters - prioritize accuracy over speed
-    frame_skip = 3  # Process every 3rd frame for thorough testing
-    max_frames = total_frames if full else int(fps * 5)  # 5 seconds unless --full
+    frame_skip = 15  # Process every 3rd frame for thorough testing
+    max_frames = (
+        total_frames if full else int(fps * duration)
+    )  # 5 seconds unless --full
     save_interval = max(1, int(fps / frame_skip) // 2)  # Save ~2 frames per second
 
     print(
@@ -507,7 +509,9 @@ def test_video(video_path: str, full: bool = False, save_debug: bool = True):
 
     print("-" * 100)
     print("TEST COMPLETE")
-    print(f"Processed {processed} frames in {total_time:.2f}s")
+    print(
+        f"Processed {processed} frames out of a total of {processed * (fps / 15)} in {total_time:.2f}s"
+    )
     print(f"Average processing time per frame: {avg_processing_time * 1000:.1f}ms")
     print(
         f"Theoretical max FPS: {1 / avg_processing_time:.1f}"
