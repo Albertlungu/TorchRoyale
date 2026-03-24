@@ -306,8 +306,17 @@ def build_episodes_from_videos(
             print(f"\n=== Video {idx + 1}/{len(video_paths)}: {vpath} ===")
 
         outcome = None
-        if outcomes and vpath in outcomes:
-            outcome = outcomes[vpath]
+        if outcomes:
+            path_obj = Path(vpath)
+            lookup_keys = (
+                vpath,
+                path_obj.name,
+                path_obj.stem,
+            )
+            for key in lookup_keys:
+                if key in outcomes:
+                    outcome = outcomes[key]
+                    break
 
         try:
             ep = build_episode_from_video(

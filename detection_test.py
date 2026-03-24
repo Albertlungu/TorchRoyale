@@ -80,6 +80,7 @@ class DetectionPipeline:
         self.model = get_model(model_id=model_id)
         self.mapper: Optional[CoordinateMapper] = None
         self.validator: Optional[PlacementValidator] = None
+        self._calibrated_size: Optional[tuple[int, int]] = None
 
     def process_image(self, image_path: str) -> Dict[str, Any]:
         """
@@ -185,12 +186,17 @@ class DetectionPipeline:
         Adjust the arena_top_ratio and arena_bottom_ratio based on your
         screen capture setup. These defaults work for standard mobile captures.
         """
+        target_size = (image_width, image_height)
+        if self._calibrated_size == target_size and self.mapper is not None and self.validator is not None:
+            return
+
         self.mapper = CoordinateMapper()
         self.mapper.calibrate_from_image(
             image_width=image_width,
             image_height=image_height,
         )
         self.validator = PlacementValidator(self.mapper)
+        self._calibrated_size = target_size
 
         print(f"Coordinate mapper calibrated: {self.mapper}")
         print(f"Arena bounds: x=[{self.mapper.bounds.x_min}, {self.mapper.bounds.x_max}], "
