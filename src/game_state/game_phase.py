@@ -61,23 +61,12 @@ class GamePhaseTracker:
         Returns:
             Current GamePhase after update
         """
-        # Primary signal: multiplier icon
-        if multiplier_detected == 3:
-            self.current_phase = GamePhase.TRIPLE_ELIXIR
-            self.is_sudden_death = True
-            return self.current_phase
-
-        if multiplier_detected == 2:
-            if self.is_sudden_death:
-                self.current_phase = GamePhase.SUDDEN_DEATH
-            else:
-                self.current_phase = GamePhase.DOUBLE_ELIXIR
-            return self.current_phase
-
-        # Secondary signal: timer
+        # Update timer tracking
         if timer_seconds is not None:
             self._last_timer_seconds = timer_seconds
 
+        # Primary signal: timer (more reliable than multiplier icon detection)
+        if timer_seconds is not None:
             # Check for phase transitions based on timer
             if timer_seconds <= 0:
                 if self.is_sudden_death:
@@ -92,8 +81,26 @@ class GamePhaseTracker:
                     # Game over (someone won in regulation)
                     self.current_phase = GamePhase.GAME_OVER
             elif timer_seconds <= GameTimingConstants.DOUBLE_ELIXIR_START:
+                # Double elixir phase (last 60 seconds)
                 if not self.is_sudden_death:
                     self.current_phase = GamePhase.DOUBLE_ELIXIR
+            else:
+                # Single elixir phase (more than 60 seconds remaining)
+                if not self.is_sudden_death:
+                    self.current_phase = GamePhase.SINGLE_ELIXIR
+
+        # Secondary signal: multiplier icon (only trust if no timer or confirms timer-based phase)
+        # This helps catch triple elixir and sudden death transitions
+        if multiplier_detected == 3:
+            self.current_phase = GamePhase.TRIPLE_ELIXIR
+            self.is_sudden_death = True
+        elif multiplier_detected == 2 and self.is_sudden_death:
+            # x2 icon in sudden death (before triple elixir phase)
+            self.current_phase = GamePhase.SUDDEN_DEATH
+        elif multiplier_detected == 1 and timer_seconds is None:
+            # Only trust x1 icon if no timer available
+            if not self.is_sudden_death:
+                self.current_phase = GamePhase.SINGLE_ELIXIR
 
         # Sudden death overtime tracking
         if self.is_sudden_death and self.overtime_start_ms is not None:

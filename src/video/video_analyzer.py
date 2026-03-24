@@ -13,10 +13,15 @@ Outputs JSON with timestamps and optionally saves annotated frames.
 
 import json
 import cv2
+import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
 import sys
+
+# Set persistent cache directory for RoboFlow models
+# This prevents re-downloading weights on each run
+os.environ["MODEL_CACHE_DIR"] = os.path.expanduser("~/.roboflow/cache")
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent

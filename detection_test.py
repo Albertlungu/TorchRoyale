@@ -28,6 +28,10 @@ import numpy as np
 import supervision as sv
 from inference import get_model
 
+# Set persistent cache directory for RoboFlow models
+# This prevents re-downloading weights on each run
+os.environ["MODEL_CACHE_DIR"] = os.path.expanduser("~/.roboflow/cache")
+
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -36,13 +40,14 @@ from src.grid.validity_masks import PlacementValidator, CARD_TYPES, ON_FIELD_CAR
 
 
 # Configuration
-ROBOFLOW_MODEL_ID = "torchroyale/5"
+ROBOFLOW_MODEL_ID = "torchroyale/4"
 DEFAULT_TEST_DATA_DIR = Path("tests/data")
 
 
 @dataclass
 class Detection:
     """Represents a single detected object with both pixel and tile coordinates."""
+
     class_name: str
     confidence: float
     # Pixel coordinates (from Roboflow)
@@ -60,8 +65,10 @@ class Detection:
     def __repr__(self) -> str:
         side = "opponent" if self.is_opponent else "friendly"
         status = "on-field" if self.is_on_field else "in-hand"
-        return (f"Detection({self.class_name}, tile=({self.tile_x}, {self.tile_y}), "
-                f"conf={self.confidence:.2f}, {side}, {status})")
+        return (
+            f"Detection({self.class_name}, tile=({self.tile_x}, {self.tile_y}), "
+            f"conf={self.confidence:.2f}, {side}, {status})"
+        )
 
 
 class DetectionPipeline:
@@ -187,7 +194,11 @@ class DetectionPipeline:
         screen capture setup. These defaults work for standard mobile captures.
         """
         target_size = (image_width, image_height)
-        if self._calibrated_size == target_size and self.mapper is not None and self.validator is not None:
+        if (
+            self._calibrated_size == target_size
+            and self.mapper is not None
+            and self.validator is not None
+        ):
             return
 
         self.mapper = CoordinateMapper()
@@ -199,8 +210,10 @@ class DetectionPipeline:
         self._calibrated_size = target_size
 
         print(f"Coordinate mapper calibrated: {self.mapper}")
-        print(f"Arena bounds: x=[{self.mapper.bounds.x_min}, {self.mapper.bounds.x_max}], "
-              f"y=[{self.mapper.bounds.y_min}, {self.mapper.bounds.y_max}]")
+        print(
+            f"Arena bounds: x=[{self.mapper.bounds.x_min}, {self.mapper.bounds.x_max}], "
+            f"y=[{self.mapper.bounds.y_min}, {self.mapper.bounds.y_max}]"
+        )
 
     def _extract_detections(self, results: Any) -> List[Detection]:
         """
@@ -227,7 +240,9 @@ class DetectionPipeline:
             # Parse class name for metadata
             class_name = prediction.class_name
             is_opponent = class_name.startswith("opponent-")
-            is_on_field = class_name in ON_FIELD_CARDS or "-on-field" in class_name.lower()
+            is_on_field = (
+                class_name in ON_FIELD_CARDS or "-on-field" in class_name.lower()
+            )
 
             # Clean class name (remove opponent- prefix for consistency)
             clean_name = class_name.replace("opponent-", "")
@@ -266,9 +281,7 @@ class DetectionPipeline:
         # Annotate
         annotated = box_annotator.annotate(scene=image, detections=sv_detections)
         annotated = label_annotator.annotate(
-            scene=annotated,
-            detections=sv_detections,
-            labels=labels
+            scene=annotated, detections=sv_detections, labels=labels
         )
 
         # Draw grid overlay (optional - shows tile boundaries)
@@ -285,18 +298,24 @@ class DetectionPipeline:
         # Draw vertical lines
         for x in range(self.mapper.GRID_WIDTH + 1):
             px = int(x * self.mapper.tile_width + self.mapper.bounds.x_min)
-            cv2.line(overlay,
-                     (px, self.mapper.bounds.y_min),
-                     (px, self.mapper.bounds.y_max),
-                     (0, 255, 0), 2)
+            cv2.line(
+                overlay,
+                (px, self.mapper.bounds.y_min),
+                (px, self.mapper.bounds.y_max),
+                (0, 255, 0),
+                2,
+            )
 
         # Draw horizontal lines
         for y in range(self.mapper.GRID_HEIGHT + 1):
             py = int(y * self.mapper.tile_height + self.mapper.bounds.y_min)
-            cv2.line(overlay,
-                     (self.mapper.bounds.x_min, py),
-                     (self.mapper.bounds.x_max, py),
-                     (0, 255, 0), 2)
+            cv2.line(
+                overlay,
+                (self.mapper.bounds.x_min, py),
+                (self.mapper.bounds.x_max, py),
+                (0, 255, 0),
+                2,
+            )
 
         # Highlight river tiles
         for y in self.mapper.RIVER_ROWS:
@@ -308,7 +327,9 @@ class DetectionPipeline:
         # Blend overlay with original
         return cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
 
-    def _build_grid_state(self, detections: List[Detection]) -> List[List[Optional[str]]]:
+    def _build_grid_state(
+        self, detections: List[Detection]
+    ) -> List[List[Optional[str]]]:
         """
         Build a 2D grid representation of the game state.
 
@@ -316,8 +337,10 @@ class DetectionPipeline:
             32x18 grid where each cell contains the class name of the unit there,
             or None if empty.
         """
-        grid = [[None for _ in range(self.mapper.GRID_WIDTH)]
-                for _ in range(self.mapper.GRID_HEIGHT)]
+        grid = [
+            [None for _ in range(self.mapper.GRID_WIDTH)]
+            for _ in range(self.mapper.GRID_HEIGHT)
+        ]
 
         for det in detections:
             if det.is_on_field:
@@ -339,14 +362,18 @@ def print_detections(detections: List[Detection]):
     print(f"\nFriendly units ({len(friendly)}):")
     for det in friendly:
         status = "on-field" if det.is_on_field else "in-hand"
-        print(f"  - {det.class_name:20s} @ tile ({det.tile_x:2d}, {det.tile_y:2d}) "
-              f"| pixel ({det.pixel_x:4d}, {det.pixel_y:4d}) | conf: {det.confidence:.2f} | {status}")
+        print(
+            f"  - {det.class_name:20s} @ tile ({det.tile_x:2d}, {det.tile_y:2d}) "
+            f"| pixel ({det.pixel_x:4d}, {det.pixel_y:4d}) | conf: {det.confidence:.2f} | {status}"
+        )
 
     print(f"\nOpponent units ({len(opponent)}):")
     for det in opponent:
         status = "on-field" if det.is_on_field else "in-hand"
-        print(f"  - {det.class_name:20s} @ tile ({det.tile_x:2d}, {det.tile_y:2d}) "
-              f"| pixel ({det.pixel_x:4d}, {det.pixel_y:4d}) | conf: {det.confidence:.2f} | {status}")
+        print(
+            f"  - {det.class_name:20s} @ tile ({det.tile_x:2d}, {det.tile_y:2d}) "
+            f"| pixel ({det.pixel_x:4d}, {det.pixel_y:4d}) | conf: {det.confidence:.2f} | {status}"
+        )
 
 
 def print_grid_state(grid_state: List[List[Optional[str]]], mapper: CoordinateMapper):

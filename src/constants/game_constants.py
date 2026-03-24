@@ -178,14 +178,7 @@ ELIXIR_COSTS: Dict[str, int] = {
 
 def get_elixir_cost(card_name: str) -> int:
     """
-    Get elixir cost for a card, handling name variants.
-
-    Strips common prefixes/suffixes from Roboflow detection names:
-    - "opponent-" prefix
-    - "-in-hand", "-next", "-on-field" suffixes
-    - "_on_field" suffix
-    - "-evolution", "_evolution" suffixes
-    - "-ability" suffix
+    Get elixir cost for a card using comprehensive card database.
 
     Args:
         card_name: Card name as detected (may include prefixes/suffixes)
@@ -193,14 +186,8 @@ def get_elixir_cost(card_name: str) -> int:
     Returns:
         Elixir cost (0 if card not found)
     """
-    clean_name = card_name.lower()
-    clean_name = clean_name.replace("opponent-", "")
-    for suffix in ["-in-hand", "-next", "-on-field", "_on_field",
-                   "-evolution", "_evolution", "-ability"]:
-        clean_name = clean_name.replace(suffix, "")
-    clean_name = clean_name.strip()
-
-    return ELIXIR_COSTS.get(clean_name, 0)
+    from .card_costs import get_card_cost
+    return get_card_cost(card_name)
 
 
 def get_regen_rate(phase: GamePhase) -> float:
