@@ -36,7 +36,7 @@ from src.grid.validity_masks import PlacementValidator, CARD_TYPES, ON_FIELD_CAR
 
 
 # Configuration
-ROBOFLOW_MODEL_ID = "torchroyale/4"
+ROBOFLOW_MODEL_ID = "torchroyale/5"
 DEFAULT_TEST_DATA_DIR = Path("tests/data")
 
 

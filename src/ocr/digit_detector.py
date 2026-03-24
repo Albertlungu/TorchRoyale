@@ -48,7 +48,7 @@ class DigitDetector:
             preload_ocr: If True, load OCR model immediately.
                         If False (default), load on first use.
         """
-        self._reader = None
+        self.reader = None
         if preload_ocr:
             self._initialize_reader()
     
@@ -68,6 +68,12 @@ class DigitDetector:
         if self._reader is None:
             self._initialize_reader()
         return self._reader
+    @reader.setter
+    def reader(self, value):
+        """
+        The setter for reader variable weak private. 
+        """
+        self._reader = value
 
     def detect_elixir(
         self,
