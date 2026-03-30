@@ -9,31 +9,33 @@ and game outcome signals.
 """
 
 import json
+import os
 import pickle
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.feature_encoder import encode
-from src.data.outcome_detector import GameOutcome, OutcomeDetector
-from src.data.label_extractor import extract_labels_from_video
 from src.constants.game_constants import get_elixir_cost
+from src.data.feature_encoder import encode
+from src.data.label_extractor import extract_labels_from_video
+from src.data.outcome_detector import GameOutcome, OutcomeDetector
 from src.transformer.config import DTConfig
 
 
 @dataclass
 class Timestep:
     """A single card-placement event with state, action, and reward."""
-    state: Dict[str, Any]      # Raw FrameState dict
-    state_vec: np.ndarray      # (97,) encoded feature vector
-    action_card: int           # 0-3 hand card index
-    action_pos: int            # 0-575 flattened tile position
+
+    state: Dict[str, Any]  # Raw FrameState dict
+    state_vec: np.ndarray  # (97,) encoded feature vector
+    action_card: int  # 0-3 hand card index
+    action_pos: int  # 0-575 flattened tile position
     reward: float = 0.0
     timestamp_ms: int = 0
 
@@ -41,6 +43,7 @@ class Timestep:
 @dataclass
 class Episode:
     """A full game as a sequence of card-placement timesteps."""
+
     timesteps: List[Timestep] = field(default_factory=list)
     outcome: GameOutcome = GameOutcome.UNKNOWN
     returns_to_go: Optional[np.ndarray] = None  # (T,) computed after rewards
@@ -172,13 +175,15 @@ def build_episode(
         # Flatten tile position
         action_pos = tile_y * 18 + tile_x
 
-        timesteps.append(Timestep(
-            state=state,
-            state_vec=state_vec,
-            action_card=card_idx,
-            action_pos=action_pos,
-            timestamp_ms=state.get("timestamp_ms", 0),
-        ))
+        timesteps.append(
+            Timestep(
+                state=state,
+                state_vec=state_vec,
+                action_card=card_idx,
+                action_pos=action_pos,
+                timestamp_ms=state.get("timestamp_ms", 0),
+            )
+        )
 
     if not timesteps:
         return Episode(outcome=outcome, video_path=video_path)
@@ -218,15 +223,29 @@ def build_episode(
 def _find_card_in_hand(card_name: str, hand_cards: List[str]) -> Optional[int]:
     """Find the index of a card in the player's hand, handling name variants."""
     clean = card_name.lower()
-    for suffix in ["-in-hand", "-next", "-on-field", "_on_field",
-                   "-evolution", "_evolution", "-ability"]:
+    for suffix in [
+        "-in-hand",
+        "-next",
+        "-on-field",
+        "_on_field",
+        "-evolution",
+        "_evolution",
+        "-ability",
+    ]:
         clean = clean.replace(suffix, "")
     clean = clean.strip()
 
     for i, hand_card in enumerate(hand_cards):
         hand_clean = hand_card.lower()
-        for suffix in ["-in-hand", "-next", "-on-field", "_on_field",
-                       "-evolution", "_evolution", "-ability"]:
+        for suffix in [
+            "-in-hand",
+            "-next",
+            "-on-field",
+            "_on_field",
+            "-evolution",
+            "_evolution",
+            "-ability",
+        ]:
             hand_clean = hand_clean.replace(suffix, "")
         hand_clean = hand_clean.strip()
         if hand_clean == clean:
@@ -284,6 +303,7 @@ def build_episodes_from_videos(
     config: Optional[DTConfig] = None,
     frame_skip: int = 6,
     verbose: bool = True,
+    allow_empty_output: bool = False,
 ) -> List[Episode]:
     """
     Process multiple videos into episodes and save to disk.
@@ -295,6 +315,7 @@ def build_episodes_from_videos(
         config: DTConfig for reward weights.
         frame_skip: Frame skip for video analysis.
         verbose: Print progress.
+        allow_empty_output: If True, writes an empty pickle when no episodes are built.
 
     Returns:
         List of Episode objects.
@@ -329,7 +350,9 @@ def build_episodes_from_videos(
             if ep.length > 0:
                 episodes.append(ep)
                 if verbose:
-                    print(f"  -> {ep.length} timesteps, return={ep.total_return:.2f}, outcome={ep.outcome.value}")
+                    print(
+                        f"  -> {ep.length} timesteps, return={ep.total_return:.2f}, outcome={ep.outcome.value}"
+                    )
             else:
                 if verbose:
                     print("  -> Skipped (no valid timesteps)")
@@ -337,11 +360,22 @@ def build_episodes_from_videos(
             if verbose:
                 print(f"  -> Error: {e}")
 
-    # Save to disk
+    if not episodes and not allow_empty_output:
+        raise RuntimeError(
+            "No non-empty episodes were built. Output file was not written. "
+            "This usually means no valid placements were detected or no played cards "
+            "were found in hand."
+        )
+
+    # Save to disk (atomic write to avoid partial/corrupted files)
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "wb") as f:
-        pickle.dump(episodes, f)
+    tmp_out = out.with_suffix(out.suffix + ".tmp")
+    with open(tmp_out, "wb") as f:
+        pickle.dump(episodes, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_out, out)
 
     if verbose:
         print(f"\nSaved {len(episodes)} episodes to {out}")
@@ -349,12 +383,14 @@ def build_episodes_from_videos(
         print(f"Total timesteps: {total_ts}")
         wins = sum(1 for ep in episodes if ep.outcome == GameOutcome.WIN)
         losses = sum(1 for ep in episodes if ep.outcome == GameOutcome.LOSS)
-        print(f"Outcomes: {wins} wins, {losses} losses, {len(episodes) - wins - losses} unknown")
+        print(
+            f"Outcomes: {wins} wins, {losses} losses, {len(episodes) - wins - losses} unknown"
+        )
 
     return episodes
 
 
-def main():
+def main() -> int:
     """CLI entry point for episode building."""
     import argparse
     import glob
@@ -388,32 +424,58 @@ def main():
         action="store_true",
         help="Suppress progress output",
     )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow writing an empty episodes pickle",
+    )
 
     args = parser.parse_args()
 
     # Resolve glob patterns
     video_paths = []
+    unmatched_patterns = []
     for pattern in args.videos:
         matched = glob.glob(pattern)
-        video_paths.extend(sorted(matched) if matched else [pattern])
+        if matched:
+            video_paths.extend(sorted(matched))
+        elif Path(pattern).is_file():
+            video_paths.append(pattern)
+        else:
+            unmatched_patterns.append(pattern)
+
+    if unmatched_patterns and not args.quiet:
+        print(f"Warning: no files matched: {', '.join(unmatched_patterns)}")
+
+    if not video_paths:
+        print("No input videos found. Nothing to process.")
+        return 2
+
+    # Deduplicate while preserving order
+    video_paths = list(dict.fromkeys(video_paths))
 
     # Load outcomes if provided
     outcomes_dict = None
     if args.outcomes:
-        with open(args.outcomes) as f:
+        with open(args.outcomes, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        outcomes_dict = {
-            k: GameOutcome(v) for k, v in raw.items()
-        }
+        outcomes_dict = {k: GameOutcome(v) for k, v in raw.items()}
 
-    build_episodes_from_videos(
-        video_paths=video_paths,
-        output_path=args.output,
-        outcomes=outcomes_dict,
-        frame_skip=args.frame_skip,
-        verbose=not args.quiet,
-    )
+    try:
+        build_episodes_from_videos(
+            video_paths=video_paths,
+            output_path=args.output,
+            outcomes=outcomes_dict,
+            frame_skip=args.frame_skip,
+            verbose=not args.quiet,
+            allow_empty_output=args.allow_empty,
+        )
+    except Exception as exc:
+        print(f"Episode build failed: {exc}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
