@@ -24,7 +24,7 @@ sys.path.insert(0, str(project_root))
 from src.constants.game_constants import get_elixir_cost
 from src.data.feature_encoder import encode
 from src.data.label_extractor import extract_labels_from_video
-from src.data.outcome_detector import GameOutcome, OutcomeDetector
+from src.data.outcome_detector import GameOutcome
 from src.transformer.config import DTConfig
 
 
@@ -266,7 +266,7 @@ def build_episode_from_video(
 
     Args:
         video_path: Path to gameplay video.
-        outcome: Pre-determined outcome. If None, auto-detects from video.
+        outcome: Pre-determined outcome. Ignored in favor of WIN for local runs.
         config: DTConfig for reward weights.
         frame_skip: Frame skip for video analysis.
         verbose: Print progress.
@@ -274,12 +274,10 @@ def build_episode_from_video(
     Returns:
         Complete Episode with rewards and returns-to-go.
     """
-    # Auto-detect outcome if not provided
-    if outcome is None:
-        detector = OutcomeDetector()
-        outcome = detector.detect_from_video(video_path)
-        if verbose:
-            print(f"Detected outcome: {outcome.value}")
+    # Force all locally processed videos to WIN.
+    outcome = GameOutcome.WIN
+    if verbose:
+        print("Forced outcome: win")
 
     # Extract (state, action) pairs
     training_pairs = extract_labels_from_video(
@@ -294,6 +292,38 @@ def build_episode_from_video(
         video_path=video_path,
         config=config,
     )
+
+
+def _load_outcome_from_analysis_json(video_path: str) -> Optional[GameOutcome]:
+    """
+    Try to load outcome from corresponding analysis JSON file.
+
+    Looks for {video_stem}_analysis.json in the output directory.
+
+    Args:
+        video_path: Path to the video file.
+
+    Returns:
+        GameOutcome if found in JSON, otherwise None.
+    """
+    video_stem = Path(video_path).stem
+    possible_json_paths = [
+        Path("output") / f"{video_stem}_analysis.json",
+        Path(video_path).parent / f"{video_stem}_analysis.json",
+    ]
+
+    for json_path in possible_json_paths:
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                outcome_str = data.get("outcome")
+                if outcome_str:
+                    return GameOutcome(outcome_str)
+            except (json.JSONDecodeError, ValueError, KeyError):
+                continue
+
+    return None
 
 
 def build_episodes_from_videos(
@@ -312,6 +342,7 @@ def build_episodes_from_videos(
         video_paths: List of video file paths.
         output_path: Where to save pickled episodes.
         outcomes: Optional dict mapping video path -> GameOutcome.
+                  If not provided, will attempt to load from analysis JSON files.
         config: DTConfig for reward weights.
         frame_skip: Frame skip for video analysis.
         verbose: Print progress.
@@ -338,6 +369,12 @@ def build_episodes_from_videos(
                 if key in outcomes:
                     outcome = outcomes[key]
                     break
+
+        # If no outcome from mapping, try to load from analysis JSON
+        if outcome is None:
+            outcome = _load_outcome_from_analysis_json(vpath)
+            if outcome is not None and verbose:
+                print(f"  Loaded outcome from analysis JSON: {outcome.value}")
 
         try:
             ep = build_episode_from_video(

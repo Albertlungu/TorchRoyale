@@ -34,6 +34,7 @@ from src.ocr.digit_detector import DigitDetector
 from src.game_state.game_phase import GamePhaseTracker
 from src.game_state.health_detector import TowerHealthDetector, TowerHealthResult
 from src.recommendation.elixir_manager import OpponentElixirTracker, PlayerElixirTracker
+from src.data.outcome_detector import OutcomeDetector, GameOutcome
 
 
 @dataclass
@@ -143,6 +144,7 @@ class VideoAnalyzer:
         self._player_tracker: Optional[PlayerElixirTracker] = None
         self._health_detector: Optional[TowerHealthDetector] = None
         self._ui_regions: Optional[UIRegions] = None
+        self._outcome_detector: Optional[OutcomeDetector] = None
 
         # Tower levels (detected once and reused)
         self._player_level: int = 15
@@ -248,6 +250,14 @@ class VideoAnalyzer:
             print("-" * 50)
             print(f"Processed {processed_count} frames")
 
+        # Detect game outcome
+        if self._outcome_detector is None:
+            self._outcome_detector = OutcomeDetector()
+        outcome = self._outcome_detector.detect_from_video(video_path)
+
+        if self.verbose:
+            print(f"Detected outcome: {outcome.value}")
+
         # Build result
         result = {
             "video_info": {
@@ -259,6 +269,7 @@ class VideoAnalyzer:
                 "frame_skip": self.frame_skip,
                 "total_frames_processed": len(frame_states),
             },
+            "outcome": outcome.value,
             "frames": [s.to_dict() for s in frame_states],
             "summary": self._generate_summary(frame_states),
         }
