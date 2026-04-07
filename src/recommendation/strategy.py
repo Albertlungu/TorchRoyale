@@ -90,10 +90,13 @@ class MLStrategy:
         if not hand_cards:
             return None
 
-        # Filter to affordable cards
+        # Filter to affordable cards in the 4 real hand slots (index 0-3).
+        _MAX_HAND = 4
         affordable_indices = [
             i for i, card in enumerate(hand_cards)
-            if get_elixir_cost(card) <= player_elixir and get_elixir_cost(card) > 0
+            if i < _MAX_HAND
+            and get_elixir_cost(card) <= player_elixir
+            and get_elixir_cost(card) > 0
         ]
 
         if not affordable_indices:
@@ -251,9 +254,14 @@ class DTStrategy:
         if not hand_cards:
             return None
 
+        # The model was trained with exactly 4 hand positions (0-3).
+        # Roboflow occasionally detects a 5th "next card" slot; ignore it.
+        _MAX_HAND = 4
         affordable_indices = [
             i for i, card in enumerate(hand_cards)
-            if get_elixir_cost(card) <= player_elixir and get_elixir_cost(card) > 0
+            if i < _MAX_HAND
+            and get_elixir_cost(card) <= player_elixir
+            and get_elixir_cost(card) > 0
         ]
 
         if not affordable_indices:
