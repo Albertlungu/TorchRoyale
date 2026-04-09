@@ -72,9 +72,7 @@ class MLStrategy:
         """Whether trained models are loaded and ready for inference."""
         return self._models_loaded
 
-    def recommend(
-        self, state: Dict[str, Any]
-    ) -> Optional[Tuple[str, int, int]]:
+    def recommend(self, state: Dict[str, Any]) -> Optional[Tuple[str, int, int]]:
         """
         Recommend a card placement given the current game state.
 
@@ -93,7 +91,8 @@ class MLStrategy:
         # Filter to affordable cards in the 4 real hand slots (index 0-3).
         _MAX_HAND = 4
         affordable_indices = [
-            i for i, card in enumerate(hand_cards)
+            i
+            for i, card in enumerate(hand_cards)
             if i < _MAX_HAND
             and get_elixir_cost(card) <= player_elixir
             and get_elixir_cost(card) > 0
@@ -156,8 +155,8 @@ class MLStrategy:
             return self._fallback(hand_cards, affordable_indices)
 
         best_pos = int(np.argmax(prob_map_2d))
-        tile_y = best_pos // 18
-        tile_x = best_pos % 18
+        tile_x = best_pos // 18
+        tile_y = best_pos % 18
 
         return (card_name, tile_x, tile_y)
 
@@ -185,7 +184,9 @@ class MLStrategy:
             if valid_tiles:
                 # Pick the valid tile closest to center
                 center_x, center_y = 9, 24
-                valid_tiles.sort(key=lambda t: abs(t[0] - center_x) + abs(t[1] - center_y))
+                valid_tiles.sort(
+                    key=lambda t: abs(t[0] - center_x) + abs(t[1] - center_y)
+                )
                 tile_x, tile_y = valid_tiles[0]
             else:
                 return None
@@ -240,9 +241,7 @@ class DTStrategy:
         if self._inference:
             self._inference.reset()
 
-    def recommend(
-        self, state: Dict[str, Any]
-    ) -> Optional[Tuple[str, int, int]]:
+    def recommend(self, state: Dict[str, Any]) -> Optional[Tuple[str, int, int]]:
         """
         Recommend a card placement given the current game state.
 
@@ -258,7 +257,8 @@ class DTStrategy:
         # Roboflow occasionally detects a 5th "next card" slot; ignore it.
         _MAX_HAND = 4
         affordable_indices = [
-            i for i, card in enumerate(hand_cards)
+            i
+            for i, card in enumerate(hand_cards)
             if i < _MAX_HAND
             and get_elixir_cost(card) <= player_elixir
             and get_elixir_cost(card) > 0
@@ -277,7 +277,9 @@ class DTStrategy:
         if card_idx not in affordable_indices:
             card_idx = affordable_indices[0]
 
-        card_name = hand_cards[card_idx] if card_idx < len(hand_cards) else hand_cards[0]
+        card_name = (
+            hand_cards[card_idx] if card_idx < len(hand_cards) else hand_cards[0]
+        )
 
         # Decode position
         tile_y = pos_flat // 18
@@ -287,9 +289,7 @@ class DTStrategy:
         if not self._validator.is_valid_placement(card_name, tile_x, tile_y):
             valid_tiles = self._validator.get_valid_tiles(card_name)
             if valid_tiles:
-                valid_tiles.sort(
-                    key=lambda t: abs(t[0] - tile_x) + abs(t[1] - tile_y)
-                )
+                valid_tiles.sort(key=lambda t: abs(t[0] - tile_x) + abs(t[1] - tile_y))
                 tile_x, tile_y = valid_tiles[0]
             else:
                 return None
