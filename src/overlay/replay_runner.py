@@ -67,6 +67,12 @@ def main():
         default="output/replay_runs",
         help="Directory for JSONL output and video analysis cache.",
     )
+    parser.add_argument(
+        "--frame-skip",
+        type=int,
+        default=6,
+        help="Process every Nth frame (higher = faster, lower = more thorough).",
+    )
     args = parser.parse_args()
 
     video_stem = Path(args.video).stem
@@ -81,6 +87,7 @@ def main():
         checkpoint_path=args.checkpoint,
         output_jsonl=str(jsonl_path),
         analysis_output_dir=str(output_dir / "analysis"),
+        frame_skip=args.frame_skip,
     )
     runner.run()
 
