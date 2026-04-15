@@ -36,7 +36,9 @@ class DTInference:
             target_return: Desired return-to-go for conditioning. If None,
                 uses mean + 1 std of training RTG distribution (from checkpoint).
         """
-        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=device, weights_only=False
+        )
 
         self.config: DTConfig = checkpoint["config"]
         self.rtg_mean: float = checkpoint.get("rtg_mean", 0.0)
@@ -103,6 +105,10 @@ class DTInference:
         timesteps = torch.zeros(1, K, dtype=torch.long)
         mask = torch.ones(1, K, dtype=torch.float32)
 
+        # Neutral default values for timesteps without recorded actions
+        # Using center of player's side: tile_x=9, tile_y=24
+        DEFAULT_POS = 24 * 18 + 9  # = 441
+
         for i in range(K):
             idx = start + i
             states[0, i] = torch.from_numpy(self._states[idx])
@@ -110,10 +116,12 @@ class DTInference:
             timesteps[0, i] = idx
 
             # Past timesteps: use actual actions taken
+            # Current timestep: use neutral default
             if idx < len(self._cards):
                 actions_card[0, i] = self._cards[idx]
                 actions_pos[0, i] = self._positions[idx]
-            # Current timestep: action=0 placeholder (will be predicted)
+            else:
+                actions_pos[0, i] = DEFAULT_POS
 
         # Left-pad if K < context_length
         if K < self.K:
@@ -124,6 +132,8 @@ class DTInference:
             rtg = torch.nn.functional.pad(rtg, (0, 0, pad, 0))
             timesteps = torch.nn.functional.pad(timesteps, (pad, 0))
             mask = torch.nn.functional.pad(mask, (pad, 0))
+            # Fill padded positions with neutral default
+            actions_pos[0, :pad] = DEFAULT_POS
 
         # Move to device
         states = states.to(self.device)
@@ -176,6 +186,8 @@ class DTInference:
         timesteps = torch.zeros(1, K, dtype=torch.long)
         mask = torch.ones(1, K, dtype=torch.float32)
 
+        DEFAULT_POS = 24 * 18 + 9
+
         for i in range(K):
             idx = start + i
             states[0, i] = torch.from_numpy(self._states[idx])
@@ -184,6 +196,8 @@ class DTInference:
             if idx < len(self._cards):
                 actions_card[0, i] = self._cards[idx]
                 actions_pos[0, i] = self._positions[idx]
+            else:
+                actions_pos[0, i] = DEFAULT_POS
 
         if K < self.K:
             pad = self.K - K
@@ -193,6 +207,7 @@ class DTInference:
             rtg = torch.nn.functional.pad(rtg, (0, 0, pad, 0))
             timesteps = torch.nn.functional.pad(timesteps, (pad, 0))
             mask = torch.nn.functional.pad(mask, (pad, 0))
+            actions_pos[0, :pad] = DEFAULT_POS
 
         states = states.to(self.device)
         actions_card = actions_card.to(self.device)

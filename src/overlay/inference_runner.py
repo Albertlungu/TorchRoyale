@@ -33,11 +33,13 @@ class InferenceRunner:
         checkpoint_path: str,
         output_jsonl: str,
         analysis_output_dir: str = "output/analysis",
+        frame_skip: int = 6,
     ):
         self._video_path = video_path
         self._checkpoint_path = checkpoint_path
         self._output_jsonl = Path(output_jsonl)
         self._analysis_output_dir = analysis_output_dir
+        self._frame_skip = frame_skip
 
     def run(self) -> Path:
         """
@@ -53,6 +55,7 @@ class InferenceRunner:
         if cached_json.exists():
             print(f"Loading cached analysis: {cached_json}")
             import json as _json
+
             with open(cached_json) as _f:
                 result = _json.load(_f)
         else:
@@ -60,6 +63,7 @@ class InferenceRunner:
             analyzer = VideoAnalyzer(
                 output_dir=self._analysis_output_dir,
                 verbose=True,
+                frame_skip=self._frame_skip,
             )
             result = analyzer.analyze_video(self._video_path)
 
