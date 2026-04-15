@@ -163,10 +163,10 @@ def build_episode(
         tile_x = action["tile_x"]
         tile_y = action["tile_y"]
 
-        # Find card index in hand
+        # Find card index in hand (valid hand slots are 0-3 only)
         hand_cards = state.get("hand_cards", [])
         card_idx = _find_card_in_hand(card_name, hand_cards)
-        if card_idx is None:
+        if card_idx is None or card_idx >= 4:
             continue
 
         # Encode state
