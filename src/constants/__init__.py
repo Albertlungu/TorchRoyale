@@ -11,6 +11,16 @@ from .game_constants import (
     get_regen_rate,
 )
 from .ui_regions import UIRegion, UIRegions
+from .card_types import (
+    CardType,
+    get_card_type,
+    get_cards_by_type,
+    is_troop,
+    is_spell,
+    is_building,
+    is_tower_troop,
+    get_card_type_name,
+)
 
 __all__ = [
     "GamePhase",
@@ -23,4 +33,12 @@ __all__ = [
     "get_regen_rate",
     "UIRegion",
     "UIRegions",
+    "CardType",
+    "get_card_type",
+    "get_cards_by_type",
+    "is_troop",
+    "is_spell",
+    "is_building",
+    "is_tower_troop",
+    "get_card_type_name",
 ]

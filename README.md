@@ -26,3 +26,11 @@ An extension of this could be to overlay the Tkinter window directly onto the ga
 [https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2](https://universe.roboflow.com/christoph-feldkircher-pxlqy/clash-royale-card-detection/model/2)
 
 [https://inference.roboflow.com/quickstart/explore_models/#run-a-private-fine-tuned-model](https://inference.roboflow.com/quickstart/explore_models/#run-a-private-fine-tuned-model)
+
+# Testing
+
+Run all unit tests:
+
+```bash
+pytest tests/test_card_types.py tests/test_card_costs.py tests/test_game_constants.py -v
+```
