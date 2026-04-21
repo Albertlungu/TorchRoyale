@@ -54,6 +54,11 @@ class InferenceConfig:
         return float(self._config.get("inference", {}).get("temperature", 1.5))
 
     @property
+    def randomize_context_actions(self) -> bool:
+        """Whether to use random actions in context to break feedback loops."""
+        return bool(self._config.get("inference", {}).get("randomize_context_actions", False))
+
+    @property
     def fallback_tile_x(self) -> int:
         """Default tile x-coordinate for fallback."""
         return int(self._config.get("strategy", {}).get("fallback_tile_x", 9))

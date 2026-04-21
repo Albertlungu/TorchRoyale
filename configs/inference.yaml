@@ -13,6 +13,9 @@ inference:
                     # 1.0 = sample from model distribution
                     # 1.5-2.0 = more exploration
                     # 2.5+ = aggressive exploration (recommended to prevent collapse)
+  randomize_context_actions: true  # Use random actions in context instead of predictions
+                                   # Breaks autoregressive feedback loops while maintaining
+                                   # temporal structure. Recommended: true
 
 # Strategy parameters
 strategy:

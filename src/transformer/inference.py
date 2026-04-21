@@ -29,6 +29,7 @@ class DTInference:
         device: str = "cpu",
         target_return: Optional[float] = None,
         temperature: float = 1.0,
+        randomize_context_actions: bool = False,
     ):
         """
         Args:
@@ -38,6 +39,8 @@ class DTInference:
                 uses mean + 1 std of training RTG distribution (from checkpoint).
             temperature: Sampling temperature for action selection. Higher = more random.
                 1.0 = sample from model distribution, 0.0 = greedy argmax.
+            randomize_context_actions: If True, use random actions in context instead of
+                predictions to break autoregressive feedback loops.
         """
         checkpoint = torch.load(
             checkpoint_path, map_location=device, weights_only=False
@@ -63,6 +66,9 @@ class DTInference:
 
         # Sampling temperature
         self.temperature = temperature
+
+        # Randomize context actions to break feedback loops
+        self.randomize_context_actions = randomize_context_actions
 
         # Context reset interval (steps before clearing history)
         # Prevents autoregressive feedback from accumulating indefinitely
@@ -278,6 +284,15 @@ class DTInference:
             tile_position: Flattened tile position (tile_y * 18 + tile_x).
             reward: Observed reward for this step (optional, decrements RTG).
         """
+        if self.randomize_context_actions:
+            # Use random actions to break autoregressive feedback loop
+            # Random card from 0-3
+            card_index = np.random.randint(0, 4)
+            # Random valid tile position (player's side: y in [14, 31], x in [0, 17])
+            tile_y = np.random.randint(14, 32)
+            tile_x = np.random.randint(0, 18)
+            tile_position = tile_y * 18 + tile_x
+
         self._cards.append(card_index)
         self._positions.append(tile_position)
         self._current_rtg -= reward

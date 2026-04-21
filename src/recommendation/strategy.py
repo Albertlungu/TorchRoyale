@@ -249,6 +249,7 @@ class DTStrategy:
             device=self._device,
             target_return=self._target_return,
             temperature=self._temperature,
+            randomize_context_actions=self._config.randomize_context_actions,
         )
         self._models_loaded = True
 
