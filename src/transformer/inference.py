@@ -158,16 +158,20 @@ class DTInference:
         # Prediction from the last real position
         last_idx = self.K - 1
 
+        # Move to CPU for sampling (MPS has numerical stability issues with multinomial)
+        card_logits_cpu = card_logits[0, last_idx].cpu()
+        pos_logits_cpu = pos_logits[0, last_idx].cpu()
+
         # Sample with temperature to prevent autoregressive collapse
         if self.temperature > 0:
-            card_probs = torch.softmax(card_logits[0, last_idx] / self.temperature, dim=-1)
-            pos_probs = torch.softmax(pos_logits[0, last_idx] / self.temperature, dim=-1)
+            card_probs = torch.softmax(card_logits_cpu / self.temperature, dim=-1)
+            pos_probs = torch.softmax(pos_logits_cpu / self.temperature, dim=-1)
             card_pred = torch.multinomial(card_probs, 1).item()
             pos_pred = torch.multinomial(pos_probs, 1).item()
         else:
             # Greedy selection (deterministic)
-            card_pred = card_logits[0, last_idx].argmax().item()
-            pos_pred = pos_logits[0, last_idx].argmax().item()
+            card_pred = card_logits_cpu.argmax().item()
+            pos_pred = pos_logits_cpu.argmax().item()
 
         return card_pred, pos_pred
 

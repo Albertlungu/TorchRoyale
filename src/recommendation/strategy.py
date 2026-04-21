@@ -22,6 +22,7 @@ from src.data.feature_encoder import encode, FEATURE_DIM
 from src.constants.game_constants import get_elixir_cost
 from src.grid.coordinate_mapper import CoordinateMapper
 from src.grid.validity_masks import PlacementValidator
+from src.utils.inference_config import InferenceConfig
 
 
 DEFAULT_MODEL_DIR = Path(project_root) / "data" / "models"
@@ -206,20 +207,38 @@ class DTStrategy:
     def __init__(
         self,
         checkpoint_path: Optional[str] = None,
-        target_return: float = 3.0,
-        device: str = "cpu",
+        target_return: Optional[float] = None,
+        device: Optional[str] = None,
+        temperature: Optional[float] = None,
+        config_path: Optional[str] = None,
     ):
-        self._checkpoint_path = checkpoint_path or str(
-            DEFAULT_MODEL_DIR / "dt" / "best.pt"
-        )
+        """
+        Initialize Decision Transformer strategy.
+
+        Args:
+            checkpoint_path: Override config checkpoint path
+            target_return: Override config target return
+            device: Override config device
+            temperature: Override config temperature
+            config_path: Path to inference config YAML (default: configs/inference.yaml)
+        """
+        # Load config
+        self._config = InferenceConfig(config_path)
+
+        # Apply overrides
+        self._checkpoint_path = checkpoint_path or self._config.checkpoint_path
+        self._target_return = target_return if target_return is not None else self._config.target_return
+        self._device = device or self._config.device
+        self._temperature = temperature if temperature is not None else self._config.temperature
+
         self._mapper = CoordinateMapper()
         self._validator = PlacementValidator(self._mapper)
         self._inference = None
         self._models_loaded = False
 
-        self._load_model(device, target_return)
+        self._load_model()
 
-    def _load_model(self, device: str, target_return: float):
+    def _load_model(self):
         if not Path(self._checkpoint_path).exists():
             return
 
@@ -227,8 +246,9 @@ class DTStrategy:
 
         self._inference = DTInference(
             checkpoint_path=self._checkpoint_path,
-            device=device,
-            target_return=target_return,
+            device=self._device,
+            target_return=self._target_return,
+            temperature=self._temperature,
         )
         self._models_loaded = True
 
@@ -307,8 +327,8 @@ class DTStrategy:
         best_idx = max(affordable_indices, key=lambda i: get_elixir_cost(hand_cards[i]))
         card_name = hand_cards[best_idx]
 
-        tile_x = 9
-        tile_y = 24
+        tile_x = self._config.fallback_tile_x
+        tile_y = self._config.fallback_tile_y
 
         if not self._validator.is_valid_placement(card_name, tile_x, tile_y):
             valid_tiles = self._validator.get_valid_tiles(card_name)
