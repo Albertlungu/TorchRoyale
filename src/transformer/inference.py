@@ -64,6 +64,10 @@ class DTInference:
         # Sampling temperature
         self.temperature = temperature
 
+        # Context reset interval (steps before clearing history)
+        # Prevents autoregressive feedback from accumulating indefinitely
+        self.context_reset_interval = 20  # Reset every ~2 seconds at 10fps
+
         # Rolling context
         self.K = self.config.context_length
         self._reset_context()
@@ -74,6 +78,7 @@ class DTInference:
         self._positions: List[int] = []
         self._rtgs: List[float] = []
         self._current_rtg = self.target_return
+        self._steps_since_reset = 0
 
     def reset(self, target_return: Optional[float] = None):
         """Reset context for a new game."""
@@ -92,8 +97,21 @@ class DTInference:
             (card_index, tile_position) where card_index is 0-3
             and tile_position is 0-575 (tile_y * 18 + tile_x).
         """
+        # Periodic context reset to prevent feedback accumulation
+        if self._steps_since_reset >= self.context_reset_interval:
+            # Keep only the most recent state, clear action history
+            if len(self._states) > 0:
+                last_state = self._states[-1]
+                last_rtg = self._rtgs[-1]
+                self._reset_context()
+                self._states.append(last_state)
+                self._rtgs.append(last_rtg)
+            else:
+                self._reset_context()
+
         # Encode state
         state_vec = encode(state_dict)
+        self._steps_since_reset += 1
 
         # Append to history
         self._states.append(state_vec)

@@ -8,11 +8,11 @@ checkpoint:
 inference:
   device: "cpu"  # Device: "cpu", "cuda", or "mps" (mps has numerical stability issues)
   target_return: 3.0  # Desired return-to-go for conditioning
-  temperature: 1.5  # Sampling temperature (higher = more random)
+  temperature: 3.0  # Sampling temperature (higher = more random)
                     # 0.0 = greedy/deterministic
                     # 1.0 = sample from model distribution
-                    # 1.5 = more exploration (recommended to prevent collapse)
-                    # 2.0+ = very random
+                    # 1.5-2.0 = more exploration
+                    # 2.5+ = aggressive exploration (recommended to prevent collapse)
 
 # Strategy parameters
 strategy:
