@@ -28,6 +28,7 @@ class DTInference:
         checkpoint_path: str,
         device: str = "cpu",
         target_return: Optional[float] = None,
+        temperature: float = 1.0,
     ):
         """
         Args:
@@ -35,6 +36,8 @@ class DTInference:
             device: Torch device string.
             target_return: Desired return-to-go for conditioning. If None,
                 uses mean + 1 std of training RTG distribution (from checkpoint).
+            temperature: Sampling temperature for action selection. Higher = more random.
+                1.0 = sample from model distribution, 0.0 = greedy argmax.
         """
         checkpoint = torch.load(
             checkpoint_path, map_location=device, weights_only=False
@@ -57,6 +60,9 @@ class DTInference:
         else:
             # Default: aim for the mean of winning games (mean + 1 std)
             self.target_return = self.rtg_mean + self.rtg_std
+
+        # Sampling temperature
+        self.temperature = temperature
 
         # Rolling context
         self.K = self.config.context_length
@@ -151,8 +157,17 @@ class DTInference:
 
         # Prediction from the last real position
         last_idx = self.K - 1
-        card_pred = card_logits[0, last_idx].argmax().item()
-        pos_pred = pos_logits[0, last_idx].argmax().item()
+
+        # Sample with temperature to prevent autoregressive collapse
+        if self.temperature > 0:
+            card_probs = torch.softmax(card_logits[0, last_idx] / self.temperature, dim=-1)
+            pos_probs = torch.softmax(pos_logits[0, last_idx] / self.temperature, dim=-1)
+            card_pred = torch.multinomial(card_probs, 1).item()
+            pos_pred = torch.multinomial(pos_probs, 1).item()
+        else:
+            # Greedy selection (deterministic)
+            card_pred = card_logits[0, last_idx].argmax().item()
+            pos_pred = pos_logits[0, last_idx].argmax().item()
 
         return card_pred, pos_pred
 
