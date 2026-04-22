@@ -1,0 +1,293 @@
+================================================================================
+TORCHROYALE CODEBASE EXPLORATION SUMMARY
+================================================================================
+
+PROJECT LOCATION: /Users/albertlungu/Local/GitHub/TorchRoyale
+
+COMPREHENSIVE ARCHITECTURE MAP GENERATED: ARCHITECTURE.md (22 KB)
+- Saved in project root directory
+- Contains detailed analysis of all 14 architectural sections
+- Includes data flow diagrams and integration points
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+1. WHAT THE CODEBASE DOES
+   - Analyzes Clash Royale game videos
+   - Detects game state (cards, towers, elixir, timer, phase)
+   - Runs Decision Transformer (DT) inference to recommend card placements
+   - Supports both post-match analysis and real-time processing
+
+2. ARCHITECTURE PATTERN
+   - Modular pipeline: Video → Frame → Detection → State → Recommendation
+   - Component-based design with clean separation of concerns
+   - Pluggable strategy system (MLStrategy vs DTStrategy)
+
+3. CORE TECHNOLOGIES
+   - Roboflow (YOLO-based detection for cards/towers)
+   - EasyOCR (for reading elixir, timer, multipliers)
+   - PyTorch + Transformers (Decision Transformer model)
+   - OpenCV (frame processing)
+   - NumPy (feature encoding)
+
+================================================================================
+DIRECTORY STRUCTURE
+================================================================================
+
+/src/                          Main source code (~19 subdirectories)
+  - detection/                 Roboflow integration (torchroyale/4 model)
+  - game_state/                State tracking (phase, tower health)
+  - grid/                       18x32 tile coordinate mapping
+  - ocr/                        EasyOCR digit detection
+  - recommendation/             Strategy implementations
+  - transformer/                Decision Transformer model & inference
+  - data/                       Feature encoding (97-dim vectors)
+  - video/                      Video processing and frame extraction
+  - ui/                         Empty stubs (no GUI yet)
+  - capture/                    Empty (no ADB yet)
+
+/pipeline_live.py              Real-time frame processing (caching-optimized)
+/detection_test.py             Roboflow detection pipeline
+/tests/                        Unit tests
+
+================================================================================
+CRITICAL COMPONENTS
+================================================================================
+
+1. GAME STATE (FrameState)
+   Location: /src/video/video_analyzer.py
+   Tracks: timestamp, elixir, timer, game_phase, towers, detections, cards
+   Updated: Per frame via VideoAnalyzer or LivePipeline
+
+2. DETECTION PIPELINE
+   Location: /detection_test.py
+   Model: Roboflow torchroyale/4 (YOLO)
+   Output: Detections with pixel & tile coordinates
+   Maps: Pixel coords → 18x32 tile grid via CoordinateMapper
+
+3. GAME PHASE TRACKER
+   Location: /src/game_state/game_phase.py
+   States: SINGLE → DOUBLE → (SUDDEN_DEATH) → TRIPLE → GAME_OVER
+   Input: multiplier icon (x1/x2/x3), timer, tower status
+   Effect: Determines elixir regen rate
+
+4. OPPONENT ELIXIR TRACKER
+   Location: /src/recommendation/elixir_manager.py
+   Calculation: 5 (start) + time*regen_rate - card_costs
+   Regen rates vary by phase (2.8s, 1.4s, 0.933s per elixir)
+
+5. FEATURE ENCODER
+   Location: /src/data/feature_encoder.py
+   Input: FrameState dict
+   Output: 97-dim fixed-size vector
+   Components: elixir(2) + phase(4) + time(1) + towers(6) + detections(80) + hand(4)
+
+6. DT STRATEGY
+   Location: /src/recommendation/strategy.py
+   Model: Decision Transformer checkpoint (.pt file)
+   Context: Maintains rolling window of past states/actions/RTG
+   Input: Feature vector + target return
+   Output: (card_index, tile_position)
+
+================================================================================
+DATA FLOW
+================================================================================
+
+Video Analysis Pipeline:
+  Video File
+    ↓ [VideoProcessor]
+  Frame (cv2.Mat)
+    ├─ [DetectionPipeline] → detections
+    ├─ [DigitDetector] → elixir, timer, multiplier
+    ├─ [GamePhaseTracker] → game_phase
+    ├─ [OpponentElixirTracker] → opponent_elixir
+    ├─ [TowerHealthDetector] → tower_health
+    ↓
+  FrameState (complete game state)
+    ↓ [feature_encoder.encode()]
+  Feature Vector (97 dims)
+    ↓ [DTStrategy.recommend()]
+  Output: (card_name, tile_x, tile_y)
+
+Real-Time Pipeline (LivePipeline):
+  Live Frame Stream
+    ├─ [OCR cached every 3 frames]
+    ├─ [Detection cached every 2 frames]
+    ├─ [Tower health cached every 15 frames]
+    ↓ [Per frame]
+  game_state_dict
+    ├─ elixir (int)
+    ├─ opponent_elixir (float)
+    ├─ timer (seconds)
+    ├─ game_phase (enum)
+    ├─ tower_health (dict)
+    └─ processing_time (float)
+
+================================================================================
+INTEGRATION POINTS FOR TORCHROYALE DT
+================================================================================
+
+Already Integrated:
+  ✓ DTStrategy class exists and works
+  ✓ Feature encoder produces correct vectors
+  ✓ Coordinate mapping handles tile conversion
+  ✓ Real-time pipeline (LivePipeline) ready
+  ✓ Inference runner generates JSONL recommendations
+
+Missing for Live Deployment:
+  ✗ ADB device integration (screen capture + input)
+  ✗ GUI/visualization (UI files are empty stubs)
+  ✗ Device-to-device automation
+
+Recommended Integration Flow:
+  1. Add ADBController class
+     - connect_device(device_id)
+     - capture_frame() → np.ndarray
+     - tap(pixel_x, pixel_y)
+
+  2. Create GameBot class
+     - Coordinate LivePipeline + DTStrategy
+     - Convert recommendations to device actions
+
+  3. Add PyQt GUI (optional)
+     - Frame display
+     - Game state overlay
+     - Recommendation visualization
+
+================================================================================
+KEY FILE REFERENCE
+================================================================================
+
+Processing:
+  pipeline_live.py                Real-time processing (30 FPS target)
+  src/video/video_analyzer.py     Full video analysis orchestration
+  detection_test.py               Roboflow detection pipeline
+  src/overlay/inference_runner.py Video → JSONL recommendations
+
+Game Logic:
+  src/game_state/game_phase.py       Elixir phase state machine
+  src/recommendation/elixir_manager.py Opponent elixir calculation
+  src/game_state/health_detector.py   Tower health OCR
+
+Models & Inference:
+  src/recommendation/strategy.py   MLStrategy (RF) + DTStrategy (DT)
+  src/transformer/inference.py     DTInference wrapper (context window)
+  src/transformer/model.py         Decision Transformer architecture
+
+Data Processing:
+  src/data/feature_encoder.py      FrameState → feature vector
+  src/grid/coordinate_mapper.py    Pixel ↔ tile grid mapping
+  src/grid/validity_masks.py       Card placement validity rules
+  src/constants/game_constants.py  Elixir rates, tower HP, phases
+
+OCR & Detection:
+  src/ocr/digit_detector.py        EasyOCR digit detection
+  src/constants/ui_regions.py      UI element pixel regions
+
+================================================================================
+PERFORMANCE CHARACTERISTICS
+================================================================================
+
+LivePipeline (Real-time):
+  Target FPS: 30
+  Actual FPS: 15-30
+  Caching:
+    - OCR: every 3 frames (10 Hz)
+    - Detection: every 2 frames (15 Hz)
+    - Tower health: every 15 frames (2 Hz)
+  Processing time per frame: ~30-50ms
+
+VideoAnalyzer (Batch):
+  Frame skip: configurable (default 6 = ~5 FPS from 30 FPS)
+  Processing: ~1-5 FPS depending on frame skip
+  Output: JSON analysis file + optional annotated frames
+
+================================================================================
+DEPENDENCIES
+================================================================================
+
+Core:
+  - pytorch >= 2.0
+  - opencv-python >= 4.8
+  - easyocr >= 1.6
+  - numpy >= 1.24
+
+Detection & Vision:
+  - roboflow >= 1.1
+  - supervision >= 0.19
+  - inference >= 0.12
+
+ML:
+  - scikit-learn (for MLStrategy fallback)
+  - joblib
+
+================================================================================
+CURRENT LIMITATIONS & GAPS
+================================================================================
+
+No GUI Components:
+  /src/ui/main_window.py      (empty)
+  /src/ui/card_display.py     (empty)
+  /src/ui/grid_overlay.py     (empty)
+  → Need PyQt6 implementation for visualization
+
+No ADB Integration:
+  /src/capture/              (empty)
+  → No Android device connectivity
+  → No screen capture from devices
+  → No input injection
+
+Video-Only System:
+  → Designed for post-match analysis
+  → Live play would require ADB + event loop
+
+================================================================================
+WHAT WORKS TODAY
+================================================================================
+
+✓ Video analysis (MP4 → JSON game states)
+✓ Real-time frame processing (from video stream)
+✓ Card/tower detection (Roboflow)
+✓ Elixir/timer/phase detection (OCR)
+✓ Game state tracking (comprehensive)
+✓ Feature encoding (for any RL model)
+✓ DT model inference (with context window)
+✓ Recommendation generation (JSONL output)
+✓ Coordinate mapping (pixel ↔ tile grid)
+✓ Placement validation (card-specific rules)
+
+✗ GUI/visualization
+✗ Live device control
+✗ ADB integration
+✗ Real-time gameplay automation
+
+================================================================================
+DEPLOYMENT PATHS
+================================================================================
+
+Path 1: Video Analysis Only (READY NOW)
+  - Analyze recorded games
+  - Generate JSONL recommendations
+  - No device needed
+
+Path 2: Real-Time with DT Model (MOSTLY READY)
+  - Feed video stream to LivePipeline
+  - Get real-time state + recommendations
+  - Still need visualization/device control
+
+Path 3: Live Gameplay Bot (TODO)
+  - Add ADBController
+  - Create GameBot orchestrator
+  - Add optional PyQt GUI
+  - Deploy to Android device
+
+================================================================================
+COMPREHENSIVE MAP SAVED TO
+================================================================================
+
+File: /Users/albertlungu/Local/GitHub/TorchRoyale/ARCHITECTURE.md
+Size: 22 KB
+Sections: 14 detailed sections with code examples
+Contains: Directory structure, data flows, component details, integration points
+
