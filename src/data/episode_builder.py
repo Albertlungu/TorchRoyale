@@ -16,7 +16,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import cv2
 import numpy as np
+import pytesseract
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -252,6 +254,224 @@ def _find_card_in_hand(card_name: str, hand_cards: List[str]) -> Optional[int]:
             return i
 
     return None
+
+
+def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int]:
+    """
+    Scan video for frames containing "Match Over" text using OCR.
+
+    Returns list of timestamps (in milliseconds) where "Match Over" appears.
+    """
+    if verbose:
+        print("Scanning video for 'Match Over' text...")
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        if verbose:
+            print(f"  ERROR: Could not open video: {video_path}")
+        return []
+
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    match_over_timestamps = []
+    last_match_over_time = -10000  # Track to avoid duplicates from consecutive frames
+
+    # Sample every second to speed up scanning
+    frame_skip = int(fps) if fps > 0 else 30
+    frame_idx = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
+
+        # Only check every Nth frame
+        if frame_idx % frame_skip == 0:
+            # Convert to grayscale for better OCR
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Use pytesseract to extract text from entire frame
+            text = pytesseract.image_to_string(gray, config='--psm 6')
+
+            # Look for "Match Over" (case insensitive)
+            if "match over" in text.lower() or "matchover" in text.lower():
+                # Avoid duplicates from consecutive frames (within 5 seconds)
+                if timestamp_ms - last_match_over_time > 5000:
+                    match_over_timestamps.append(timestamp_ms)
+                    last_match_over_time = timestamp_ms
+                    if verbose:
+                        print(f"  Found 'Match Over' at {timestamp_ms / 1000:.1f}s")
+
+        frame_idx += 1
+
+        # Progress indicator
+        if verbose and frame_idx % (frame_skip * 10) == 0:
+            progress = (frame_idx / total_frames) * 100 if total_frames > 0 else 0
+            print(f"  Scanning... {progress:.0f}% complete", end='\r')
+
+    cap.release()
+
+    if verbose:
+        print(f"\n  Found {len(match_over_timestamps)} 'Match Over' instances")
+
+    return match_over_timestamps
+
+
+def _detect_game_boundaries(
+    training_pairs: List[Dict[str, Any]],
+    match_over_timestamps: Optional[List[int]] = None,
+) -> List[int]:
+    """
+    Detect boundaries between multiple games in a single video.
+
+    Returns list of indices where new games start (first game starts at 0).
+
+    Detects new games by looking for:
+    - "Match Over" text detected via OCR
+    - All towers resetting to full health
+    - Elixir resetting to starting value
+    """
+    if not training_pairs:
+        return [0]
+
+    boundaries = [0]
+
+    # Convert match_over_timestamps to a set for quick lookup
+    match_over_set = set(match_over_timestamps) if match_over_timestamps else set()
+
+    for i in range(1, len(training_pairs)):
+        prev_state = training_pairs[i - 1]["state"]
+        curr_state = training_pairs[i]["state"]
+        curr_timestamp = curr_state.get("timestamp_ms", 0)
+
+        # Check for "Match Over" detection within 5 seconds of this timestamp
+        match_over_detected = False
+        if match_over_set:
+            for mo_time in match_over_set:
+                if abs(curr_timestamp - mo_time) < 5000:  # Within 5 seconds
+                    match_over_detected = True
+                    break
+
+        # Check if all player towers reset to full health
+        player_towers_reset = _all_towers_full(curr_state, "player_towers")
+        opponent_towers_reset = _all_towers_full(curr_state, "opponent_towers")
+
+        # Check if both sets of towers went from damaged to full
+        prev_player_damaged = not _all_towers_full(prev_state, "player_towers")
+        prev_opponent_damaged = not _all_towers_full(prev_state, "opponent_towers")
+
+        tower_reset = (player_towers_reset and opponent_towers_reset and
+                      (prev_player_damaged or prev_opponent_damaged))
+
+        # New game detected if we see "Match Over" OR tower reset
+        if match_over_detected or tower_reset:
+            # Avoid duplicate boundaries
+            if not boundaries or i - boundaries[-1] > 10:  # At least 10 timesteps apart
+                boundaries.append(i)
+
+    return boundaries
+
+
+def _all_towers_full(state: Dict[str, Any], tower_group: str) -> bool:
+    """Check if all towers in a group are at full health."""
+    towers = state.get(tower_group, {})
+    for tower_key in ["left", "king", "right"]:
+        tower_key_full = f"player_{tower_key}" if "player" in tower_group else f"opponent_{tower_key}"
+        tower = towers.get(tower_key_full, {})
+
+        if tower.get("is_destroyed", False):
+            return False
+
+        hp_percent = tower.get("health_percent")
+        if hp_percent is not None and hp_percent < 95:  # Allow small margin
+            return False
+
+    return True
+
+
+def build_episodes_from_multi_game_video(
+    video_path: str,
+    num_games: Optional[int] = None,
+    outcome: GameOutcome = GameOutcome.WIN,
+    config: Optional[DTConfig] = None,
+    frame_skip: int = 6,
+    verbose: bool = True,
+) -> List[Episode]:
+    """
+    Process a video containing multiple games into separate episodes.
+
+    Args:
+        video_path: Path to video file containing multiple games.
+        num_games: Expected number of games (for validation, optional).
+        outcome: Outcome to assign to all games.
+        config: DTConfig for reward weights.
+        frame_skip: Frame skip for video analysis.
+        verbose: Print progress.
+
+    Returns:
+        List of Episode objects, one per game detected.
+    """
+    if verbose:
+        print(f"Processing multi-game video: {video_path}")
+        print(f"Expected games: {num_games if num_games else 'auto-detect'}")
+        print(f"Outcome for all games: {outcome.value}")
+        print()
+
+    # First, scan video for "Match Over" text
+    match_over_timestamps = _detect_match_over_frames(video_path, verbose=verbose)
+
+    if verbose:
+        print()
+
+    # Extract all (state, action) pairs from the full video
+    training_pairs = extract_labels_from_video(
+        video_path,
+        frame_skip=frame_skip,
+        verbose=verbose,
+    )
+
+    if not training_pairs:
+        if verbose:
+            print("No training pairs extracted from video")
+        return []
+
+    # Detect game boundaries using both "Match Over" and tower reset signals
+    boundaries = _detect_game_boundaries(training_pairs, match_over_timestamps)
+
+    if verbose:
+        print(f"\nDetected {len(boundaries)} games at indices: {boundaries}")
+
+    # Split into separate episodes
+    episodes = []
+    for game_idx in range(len(boundaries)):
+        start_idx = boundaries[game_idx]
+        end_idx = boundaries[game_idx + 1] if game_idx + 1 < len(boundaries) else len(training_pairs)
+
+        game_pairs = training_pairs[start_idx:end_idx]
+
+        if not game_pairs:
+            continue
+
+        ep = build_episode(
+            training_pairs=game_pairs,
+            outcome=outcome,
+            video_path=f"{video_path}#game{game_idx + 1}",
+            config=config,
+        )
+
+        if ep.length > 0:
+            episodes.append(ep)
+            if verbose:
+                print(f"  Game {game_idx + 1}: {ep.length} timesteps, return={ep.total_return:.2f}")
+
+    if num_games is not None and len(episodes) != num_games:
+        if verbose:
+            print(f"WARNING: Expected {num_games} games but detected {len(episodes)}")
+
+    return episodes
 
 
 def build_episode_from_video(
