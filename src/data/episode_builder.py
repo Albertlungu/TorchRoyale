@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
-import pytesseract
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -265,6 +264,15 @@ def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int
     if verbose:
         print("Scanning video for 'Match Over' text...")
 
+    # Initialize easyOCR reader
+    try:
+        import easyocr
+        reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+    except ImportError:
+        if verbose:
+            print("  WARNING: easyocr not available, skipping OCR detection")
+        return []
+
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         if verbose:
@@ -277,8 +285,8 @@ def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int
     match_over_timestamps = []
     last_match_over_time = -10000  # Track to avoid duplicates from consecutive frames
 
-    # Sample every second to speed up scanning
-    frame_skip = int(fps) if fps > 0 else 30
+    # Sample every 2 seconds to speed up scanning
+    frame_skip = int(fps * 2) if fps > 0 else 60
     frame_idx = 0
 
     while True:
@@ -290,25 +298,30 @@ def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int
 
         # Only check every Nth frame
         if frame_idx % frame_skip == 0:
-            # Convert to grayscale for better OCR
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            try:
+                # Use easyOCR to extract text from entire frame
+                results = reader.readtext(frame, paragraph=False)
 
-            # Use pytesseract to extract text from entire frame
-            text = pytesseract.image_to_string(gray, config='--psm 6')
-
-            # Look for "Match Over" (case insensitive)
-            if "match over" in text.lower() or "matchover" in text.lower():
-                # Avoid duplicates from consecutive frames (within 5 seconds)
-                if timestamp_ms - last_match_over_time > 5000:
-                    match_over_timestamps.append(timestamp_ms)
-                    last_match_over_time = timestamp_ms
-                    if verbose:
-                        print(f"  Found 'Match Over' at {timestamp_ms / 1000:.1f}s")
+                # Check all detected text
+                for (bbox, text, confidence) in results:
+                    text_lower = text.lower().strip()
+                    # Look for "Match Over" or "Match" and "Over" nearby
+                    if ("match" in text_lower and "over" in text_lower) or "matchover" in text_lower:
+                        # Avoid duplicates from consecutive frames (within 5 seconds)
+                        if timestamp_ms - last_match_over_time > 5000:
+                            match_over_timestamps.append(timestamp_ms)
+                            last_match_over_time = timestamp_ms
+                            if verbose:
+                                print(f"  Found 'Match Over' at {timestamp_ms / 1000:.1f}s (text: '{text}')")
+                            break
+            except Exception as e:
+                if verbose:
+                    print(f"  OCR error at frame {frame_idx}: {e}")
 
         frame_idx += 1
 
         # Progress indicator
-        if verbose and frame_idx % (frame_skip * 10) == 0:
+        if verbose and frame_idx % (frame_skip * 5) == 0:
             progress = (frame_idx / total_frames) * 100 if total_frames > 0 else 0
             print(f"  Scanning... {progress:.0f}% complete", end='\r')
 
