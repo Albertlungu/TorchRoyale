@@ -26,7 +26,7 @@ def main():
     parser.add_argument(
         "--outcome",
         default="win",
-        choices=["win", "loss", "draw"],
+        choices=["win", "loss"],
         help="Outcome for all games (default: win)",
     )
     parser.add_argument(
@@ -51,7 +51,6 @@ def main():
     outcome_map = {
         "win": GameOutcome.WIN,
         "loss": GameOutcome.LOSS,
-        "draw": GameOutcome.DRAW,
     }
     outcome = outcome_map[args.outcome]
 
