@@ -285,8 +285,8 @@ def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int
     match_over_timestamps = []
     last_match_over_time = -10000  # Track to avoid duplicates from consecutive frames
 
-    # Sample every 2 seconds to speed up scanning
-    frame_skip = int(fps * 2) if fps > 0 else 60
+    # Sample twice per second (every 0.5 seconds)
+    frame_skip = int(fps / 2) if fps > 0 else 15
     frame_idx = 0
 
     while True:
