@@ -32,6 +32,7 @@ from src.constants.game_constants import ElixirConstants, GamePhase
 from src.constants.ui_regions import UIRegions
 from src.data.outcome_detector import GameOutcome, OutcomeDetector
 from src.game_state.game_phase import GamePhaseTracker
+from src.game_state.hand_tracker import HandTracker
 from src.game_state.health_detector import TowerHealthDetector, TowerHealthResult
 from src.ocr.digit_detector import DigitDetector
 from src.recommendation.elixir_manager import OpponentElixirTracker, PlayerElixirTracker
@@ -143,6 +144,7 @@ class VideoAnalyzer:
         self._detection_pipeline = None
         self._digit_detector: Optional[DigitDetector] = None
         self._phase_tracker: Optional[GamePhaseTracker] = None
+        self._hand_tracker: Optional[HandTracker] = None
         self._opponent_tracker: Optional[OpponentElixirTracker] = None
         self._player_tracker: Optional[PlayerElixirTracker] = None
         self._health_detector: Optional[TowerHealthDetector] = None
@@ -162,6 +164,7 @@ class VideoAnalyzer:
         self._video_processor = VideoProcessor(frame_skip=self.frame_skip)
         self._digit_detector = DigitDetector()
         self._phase_tracker = GamePhaseTracker()
+        self._hand_tracker = HandTracker()
         self._opponent_tracker = OpponentElixirTracker()
         self._player_tracker = PlayerElixirTracker()
         self._health_detector = TowerHealthDetector()
@@ -212,6 +215,7 @@ class VideoAnalyzer:
 
         # Reset trackers for new game
         self._phase_tracker.reset()
+        self._hand_tracker.reset()
         self._opponent_tracker.reset()
         self._player_tracker.reset()
         self._levels_detected = False
@@ -333,12 +337,17 @@ class VideoAnalyzer:
                         }
                     )
 
-                # Extract hand cards
-                hand_cards = [
-                    det.class_name
-                    for det in raw_detections
-                    if not det.is_opponent and not det.is_on_field
-                ]
+                # Extract hand cards via HandTracker for stable 4-card state
+                hand_cards = self._hand_tracker.update(
+                    [
+                        {
+                            "class_name": det.class_name,
+                            "is_opponent": det.is_opponent,
+                            "is_on_field": det.is_on_field,
+                        }
+                        for det in raw_detections
+                    ]
+                )
             except Exception as e:
                 if self.verbose:
                     print(f"Detection error at frame {frame_num}: {e}")
