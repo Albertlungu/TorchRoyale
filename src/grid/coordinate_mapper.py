@@ -211,6 +211,68 @@ class CoordinateMapper:
         )
         self._calculate_tile_dimensions()
 
+    def calibrate_from_frame(self, frame, black_thresh: int = 30) -> None:
+        """
+        Calibrate arena bounds from an actual video frame.
+
+        Handles portrait games embedded in landscape frames (e.g. a 1920x1080
+        frame with the portrait game centred and black bars on the sides). Scans
+        for the game content bounds using non-black column/row detection, then
+        scales the reference calibration to those bounds rather than to the full
+        frame dimensions.
+
+        Falls back to calibrate_from_image if the content bounds cannot be
+        detected (e.g. a pure portrait frame with no black bars).
+        """
+        try:
+            import numpy as _np
+        except ImportError:
+            h, w = frame.shape[:2]
+            self.calibrate_from_image(w, h)
+            return
+
+        h, w = frame.shape[:2]
+        gray = _np.mean(frame, axis=2) if frame.ndim == 3 else frame
+
+        cols_nonblack = _np.where(_np.mean(gray, axis=0) > black_thresh)[0]
+        rows_nonblack = _np.where(_np.mean(gray, axis=1) > black_thresh)[0]
+
+        if cols_nonblack.size == 0 or rows_nonblack.size == 0:
+            self.calibrate_from_image(w, h)
+            return
+
+        left  = int(cols_nonblack.min())
+        right = int(cols_nonblack.max())
+        top   = int(rows_nonblack.min())
+        bot   = int(rows_nonblack.max())
+
+        game_w = max(1, right - left)
+        game_h = max(1, bot   - top)
+
+        # Only apply game-content correction when there are meaningful black
+        # bars (i.e. the game content is narrower than 80% of frame width).
+        if game_w >= w * 0.80:
+            self.calibrate_from_image(w, h)
+            return
+
+        scale_x = game_w / self._REF_WIDTH
+        scale_y = game_h / self._REF_HEIGHT
+
+        x_min = left + self._REF_ORIGIN_X * scale_x
+        y_min = top  + self._REF_ORIGIN_Y * scale_y
+        tile_w = self._REF_TILE_W * scale_x
+        tile_h = self._REF_TILE_H * scale_y
+
+        self.bounds = ArenaBounds(
+            x_min=int(round(x_min)),
+            y_min=int(round(y_min)),
+            x_max=int(round(x_min + self.GRID_WIDTH * tile_w)),
+            y_max=int(round(y_min + self.GRID_HEIGHT * tile_h)),
+            image_width=w,
+            image_height=h,
+        )
+        self._calculate_tile_dimensions()
+
     def to_dict(self) -> Dict[str, Any]:
         """Export configuration to dictionary."""
         return {

@@ -85,8 +85,17 @@ class VideoPlayer:
               f"frame_delay={self._frame_delay_ms}ms", flush=True)
 
         # Coordinate mapper calibrated to VIDEO resolution (not display).
+        # Sample a frame from 10% into the video to avoid loading screens,
+        # then use it to detect game content bounds for portrait-in-landscape.
         self._mapper = CoordinateMapper()
-        self._mapper.calibrate_from_image(self._vid_w, self._vid_h)
+        _calib_pos = max(0, int(self._total_frames * 0.10))
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, _calib_pos)
+        ret, _calib_frame = self._cap.read()
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        if ret and _calib_frame is not None:
+            self._mapper.calibrate_from_frame(_calib_frame)
+        else:
+            self._mapper.calibrate_from_image(self._vid_w, self._vid_h)
 
         # Load JSONL.
         all_entries = _load_jsonl(jsonl_path)
