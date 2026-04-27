@@ -12,7 +12,7 @@ Default calibrated for 1080x2400 mobile resolution.
 """
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -82,13 +82,25 @@ class UIRegions:
         # TOP UI REGION (0-12% of screen height)
         # ============================================
 
-        # Timer region (top center-right, shows MM:SS)
-        self.timer = UIRegion(
-            x_min=int(w * 0.87),
-            y_min=int(h * 0.075),
-            x_max=int(w * 0.97),
-            y_max=int(h * 0.1),
-        )
+        # Timer region (top center-right, shows MM:SS).
+        # Use different ratios for portrait vs landscape videos.
+        if w > h:
+            # Landscape (desktop exports): place timer nearer the top-right
+            # but slightly lower and narrower than the initial guess.
+            self.timer = UIRegion(
+                x_min=int(w * 0.954),
+                y_min=int(h * 0.068),
+                x_max=int(w * 0.96),
+                y_max=int(h * 0.095),
+            )
+        else:
+            # Portrait (mobile captures)
+            self.timer = UIRegion(
+                x_min=int(w * 0.87),
+                y_min=int(h * 0.075),
+                x_max=int(w * 0.97),
+                y_max=int(h * 0.1),
+            )
 
         # Multiplier icon region (x2/x3 indicator, appears top center)
         self.multiplier_icon = UIRegion(
@@ -97,6 +109,84 @@ class UIRegions:
             x_max=int(w * 0.96),
             y_max=int(h * 0.155),
         )
+
+        def align_region_to_image(
+            self,
+            image,
+            region_attr: str,
+            black_thresh: int = 10,
+            padding: int = 6,
+            width_ratio: Optional[float] = None,
+            shift_down: int = 0,
+        ):
+            """
+            Generic aligner: if the named region crop is black, scan the image for
+            the rightmost non-black column and place the region box relative to it.
+
+            Args:
+                image: Full frame as numpy array
+                region_attr: Attribute name on this UIRegions instance (e.g. 'elixir_number')
+                black_thresh: Brightness threshold to consider a crop black
+                padding: pixels to pad to the right of detected column
+                width_ratio: Fraction of screen width to use for width. If None,
+                             use the current region width.
+                shift_down: Pixels to move the bbox downward (positive = lower)
+
+            Returns:
+                (rightmost_column_index, (new_x_min,new_y_min,new_x_max,new_y_max)) or None
+            """
+            try:
+                import numpy as _np
+            except Exception:
+                return None
+
+            if not hasattr(self, region_attr):
+                return None
+
+            region: UIRegion = getattr(self, region_attr)
+            x1, y1, x2, y2 = region.to_tuple()
+            h, w = image.shape[:2]
+
+            if x1 >= x2 or y1 >= y2 or x1 >= w or y1 >= h:
+                return None
+
+            crop = image[y1:y2, x1:x2]
+            if crop.size == 0:
+                return None
+
+            gray = _np.mean(crop, axis=2) if crop.ndim == 3 else crop
+            if _np.mean(gray) > black_thresh:
+                return None
+
+            full_gray = _np.mean(image, axis=2) if image.ndim == 3 else image
+            cols_nonblack = _np.where(_np.mean(full_gray, axis=0) > black_thresh)[0]
+            if cols_nonblack.size == 0:
+                return None
+
+            rightmost = int(cols_nonblack.max())
+
+            if width_ratio is None:
+                desired_w = max(8, x2 - x1)
+            else:
+                desired_w = max(8, int(self.width * width_ratio))
+
+            new_x_max = min(w, rightmost + padding)
+            new_x_min = max(0, new_x_max - desired_w)
+
+            desired_h = max(4, y2 - y1)
+            new_y_min = min(max(0, y1 + shift_down), max(0, h - desired_h))
+            new_y_max = new_y_min + desired_h
+
+            # Update the region in-place
+            region.x_min = int(new_x_min)
+            region.x_max = int(new_x_max)
+            region.y_min = int(new_y_min)
+            region.y_max = int(new_y_max)
+
+            return (
+                rightmost,
+                (int(new_x_min), int(new_y_min), int(new_x_max), int(new_y_max)),
+            )
 
         # ============================================
         # BOTTOM UI REGION (80-100% of screen height)
@@ -240,3 +330,216 @@ class UIRegions:
 
     def __repr__(self) -> str:
         return f"UIRegions(width={self.width}, height={self.height})"
+
+    def align_elixir_to_image(
+        self, image, black_thresh: int = 10, box_w: int = 40, box_h: int = 27,
+        x_offset: int = 126, y_offset: int = 10
+    ):
+        """
+        Anchor the elixir number box using two independent signals:
+          X: leftmost non-black column (game content left edge) + x_offset
+          Y: row with the longest horizontal run of saturated pixels in the
+             bottom 40% of the frame (the elixir bar), shifted up by y_offset
+
+        This separates the two axes so each can be independently reliable:
+        x_offset is consistent across all videos, and the bar row is found
+        adaptively so different arena styles and recording heights all work.
+        """
+        try:
+            import numpy as _np
+            import cv2 as _cv2
+        except Exception:
+            return
+
+        if image is None or image.size == 0:
+            return
+
+        cur = self.elixir_number
+        x1, y1, x2, y2 = cur.to_tuple()
+        h, w = image.shape[:2]
+
+        # --- X anchor: leftmost non-black column ---
+        cx1 = max(0, min(x1, w - 1))
+        cy1 = max(0, min(y1, h - 1))
+        cx2 = max(0, min(x2, w))
+        cy2 = max(0, min(y2, h))
+        crop = image[cy1:cy2, cx1:cx2]
+        if crop.size == 0:
+            return
+        gray = _np.mean(crop, axis=2) if crop.ndim == 3 else crop
+        if _np.mean(gray) > black_thresh:
+            return  # static region not black, no adjustment needed
+
+        full_gray = _np.mean(image, axis=2) if image.ndim == 3 else image
+        cols_nonblack = _np.where(_np.mean(full_gray, axis=0) > black_thresh)[0]
+        if cols_nonblack.size == 0:
+            return
+        leftmost = int(cols_nonblack.min())
+
+        # --- Y anchor: find bar row by detecting the elixir bar colour ---
+        # The bar is in the bottom 12% of the frame. Actual HSV of the
+        # pink/purple fill: H=130-165, S>80 (confirmed by sampling all games).
+        search_top = int(h * 0.88)
+        roi = image[search_top:, :]
+        roi_hsv = _cv2.cvtColor(roi, _cv2.COLOR_BGR2HSV)
+        bar_mask = _cv2.inRange(
+            roi_hsv,
+            _np.array([128, 80, 40]),
+            _np.array([165, 255, 255]),
+        )
+
+        best_row_rel = None
+        best_run_len = 0
+        for row_rel in range(bar_mask.shape[0]):
+            row = bar_mask[row_rel]
+            in_run, run_len = False, 0
+            for px in row:
+                if px > 0:
+                    in_run, run_len = True, run_len + 1
+                elif in_run:
+                    if run_len > best_run_len:
+                        best_run_len, best_row_rel = run_len, row_rel
+                    in_run, run_len = False, 0
+            if in_run and run_len > best_run_len:
+                best_run_len, best_row_rel = run_len, row_rel
+
+        if best_row_rel is None or best_run_len < 20:
+            return
+        bar_row = search_top + best_row_rel
+
+        # --- Place box ---
+        # The digit sits ~y_offset px above the bar row.
+        new_x_min = max(0, leftmost + x_offset)
+        new_x_max = min(w, new_x_min + box_w)
+        new_y_max = min(h, bar_row - y_offset + box_h // 2)
+        new_y_min = max(0, new_y_max - box_h)
+
+        self.elixir_number = UIRegion(
+            x_min=new_x_min, y_min=new_y_min, x_max=new_x_max, y_max=new_y_max
+        )
+
+        return (leftmost, bar_row, best_run_len,
+                (new_x_min, new_y_min, new_x_max, new_y_max))
+
+    def align_timer_to_image(
+        self, image, black_thresh: int = 10, padding: int = 6, width_ratio: float = 0.04
+    ):
+        """
+        Heuristic: if the timer ROI appears black, scan the image for the
+        rightmost non-black column and place the timer box relative to it.
+
+        Args:
+            image: Full frame as a numpy array (H,W,3)
+            black_thresh: Pixel intensity threshold (0-255) below which a
+                          pixel is considered "black".
+            padding: Number of pixels to pad to the right of the detected
+                     non-black column when placing the timer box.
+            width_ratio: Fraction of screen width to use for timer box width.
+        """
+        try:
+            import numpy as _np
+        except Exception:
+            return
+
+        if image is None or image.size == 0:
+            return
+
+        # Current timer box
+        cur = self.timer
+        x1, y1, x2, y2 = cur.to_tuple()
+
+        # If crop is empty, nothing to do
+        h, w = image.shape[:2]
+        if x1 >= x2 or y1 >= y2 or x1 >= w or y1 >= h:
+            return
+
+        crop = image[y1:y2, x1:x2]
+        if crop.size == 0:
+            return
+
+        # Convert to grayscale and check brightness
+        gray = _np.mean(crop, axis=2) if crop.ndim == 3 else crop
+        if _np.mean(gray) > black_thresh:
+            # Not black, nothing to change
+            return
+
+        # Find rightmost non-black column in full image
+        full_gray = _np.mean(image, axis=2) if image.ndim == 3 else image
+        cols_nonblack = _np.where(_np.mean(full_gray, axis=0) > black_thresh)[0]
+        if cols_nonblack.size == 0:
+            return None
+
+        rightmost = int(cols_nonblack.max())
+
+        # Desired width in pixels
+        desired_w = max(8, int(self.width * width_ratio))
+
+        new_x_max = min(w, rightmost + padding)
+        new_x_min = max(0, new_x_max - desired_w)
+
+        # Keep original height but move bbox lower for better alignment
+        desired_h = max(4, y2 - y1)
+        shift_down = 20  # shift lower by 20 pixels (user request)
+        new_y_min = min(max(0, y1 + shift_down), max(0, h - desired_h))
+        new_y_max = new_y_min + desired_h
+
+        self.timer = UIRegion(
+            x_min=new_x_min, y_min=new_y_min, x_max=new_x_max, y_max=new_y_max
+        )
+
+        # Return debug info for callers to log if desired
+        return (rightmost, (new_x_min, new_y_min, new_x_max, new_y_max))
+
+    def align_multiplier_to_image(
+        self, image, black_thresh: int = 10, padding: int = -17,
+        width_ratio: float = 0.0219, shift_down: int = 17
+    ):
+        """
+        Mirror of align_timer_to_image for the x2/x3 multiplier icon.
+
+        The icon sits just below and slightly left of the timer, so we use
+        the same rightmost non-black column anchor but shift the Y down.
+        """
+        try:
+            import numpy as _np
+        except Exception:
+            return
+
+        if image is None or image.size == 0:
+            return
+
+        cur = self.multiplier_icon
+        x1, y1, x2, y2 = cur.to_tuple()
+
+        h, w = image.shape[:2]
+        if x1 >= x2 or y1 >= y2 or x1 >= w or y1 >= h:
+            return
+
+        crop = image[y1:y2, x1:x2]
+        if crop.size == 0:
+            return
+
+        gray = _np.mean(crop, axis=2) if crop.ndim == 3 else crop
+        if _np.mean(gray) > black_thresh:
+            return
+
+        full_gray = _np.mean(image, axis=2) if image.ndim == 3 else image
+        cols_nonblack = _np.where(_np.mean(full_gray, axis=0) > black_thresh)[0]
+        if cols_nonblack.size == 0:
+            return
+
+        rightmost = int(cols_nonblack.max())
+        desired_w = max(8, int(self.width * width_ratio))
+
+        new_x_max = min(w, rightmost + padding)
+        new_x_min = max(0, new_x_max - desired_w)
+
+        desired_h = max(4, y2 - y1)
+        new_y_min = min(max(0, y1 + shift_down), max(0, h - desired_h))
+        new_y_max = new_y_min + desired_h
+
+        self.multiplier_icon = UIRegion(
+            x_min=new_x_min, y_min=new_y_min, x_max=new_x_max, y_max=new_y_max
+        )
+
+        return (rightmost, (new_x_min, new_y_min, new_x_max, new_y_max))

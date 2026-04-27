@@ -237,8 +237,20 @@ class DigitDetector:
             seconds = int(time_match.group(2))
             return minutes * 60 + seconds
 
-        # Try parsing as just seconds if no colon
+        # Colon may have been missed by OCR — try interpreting digit-only
+        # strings as M+SS (3 digits) or MM+SS (4 digits).
         if full_text.isdigit():
+            if len(full_text) == 3:
+                mins, secs = int(full_text[0]), int(full_text[1:])
+                if secs < 60:
+                    return mins * 60 + secs
+                return None
+            if len(full_text) == 4:
+                mins, secs = int(full_text[:2]), int(full_text[2:])
+                if secs < 60:
+                    return mins * 60 + secs
+                return None
+            # 1-2 digits: treat as raw seconds
             return int(full_text)
 
         return None

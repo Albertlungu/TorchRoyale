@@ -12,12 +12,13 @@ Outputs JSON with timestamps and optionally saves annotated frames.
 """
 
 import json
-import cv2
 import os
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field, asdict
 import sys
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import cv2
 
 # Set persistent cache directory for RoboFlow models
 # This prevents re-downloading weights on each run
@@ -27,19 +28,20 @@ os.environ["MODEL_CACHE_DIR"] = os.path.expanduser("~/.roboflow/cache")
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.video.video_processor import VideoProcessor, VideoInfo
-from src.constants.game_constants import GamePhase, ElixirConstants
+from src.constants.game_constants import ElixirConstants, GamePhase
 from src.constants.ui_regions import UIRegions
-from src.ocr.digit_detector import DigitDetector
+from src.data.outcome_detector import GameOutcome, OutcomeDetector
 from src.game_state.game_phase import GamePhaseTracker
 from src.game_state.health_detector import TowerHealthDetector, TowerHealthResult
+from src.ocr.digit_detector import DigitDetector
 from src.recommendation.elixir_manager import OpponentElixirTracker, PlayerElixirTracker
-from src.data.outcome_detector import OutcomeDetector, GameOutcome
+from src.video.video_processor import VideoInfo, VideoProcessor
 
 
 @dataclass
 class TowerHealth:
     """Health status for a single tower."""
+
     hp_current: Optional[int]
     hp_max: int
     health_percent: Optional[float]  # None = unknown (OCR failure)
@@ -49,6 +51,7 @@ class TowerHealth:
 @dataclass
 class FrameState:
     """Complete game state for a single frame."""
+
     # Timing
     timestamp_ms: int
     frame_number: int
@@ -164,14 +167,22 @@ class VideoAnalyzer:
         self._health_detector = TowerHealthDetector()
 
         # Detection pipeline is imported lazily to avoid circular imports
-        # and to not require Roboflow API key until needed
+        # and to not require Roboflow API key until needed.
+        # Try legacy local module name first, then fallback to the
+        # tests_debug package where the debug DetectionPipeline lives.
         try:
-            from detection_test import DetectionPipeline
+            try:
+                from detection_test import DetectionPipeline  # type: ignore
+            except Exception:
+                from tests_debug.detection_test import DetectionPipeline  # type: ignore
+
             self._detection_pipeline = DetectionPipeline()
         except Exception as e:
             if self.verbose:
-                print(f"Warning: Could not load DetectionPipeline: {e}")
-                print("Detection features will be disabled.")
+                print(f"Optional detection backend not available: {e}")
+                print(
+                    "Detection features are disabled. To enable, install optional dependencies (e.g. opencv-python, roboflow, supervision)"
+                )
             self._detection_pipeline = None
 
     def analyze_video(self, video_path: str) -> Dict[str, Any]:
@@ -237,7 +248,7 @@ class VideoAnalyzer:
                 print(
                     f"Progress: {progress:.1f}% | "
                     f"Frame {frame_num} | "
-                    f"Time {timestamp_ms/1000:.1f}s | "
+                    f"Time {timestamp_ms / 1000:.1f}s | "
                     f"Phase: {state.game_phase} | "
                     f"Player Elixir: {state.player_elixir} | "
                     f"Opp Elixir: {state.opponent_elixir_estimated:.1f}"
@@ -286,12 +297,7 @@ class VideoAnalyzer:
 
         return result
 
-    def _process_frame(
-        self,
-        frame,
-        frame_num: int,
-        timestamp_ms: int
-    ) -> FrameState:
+    def _process_frame(self, frame, frame_num: int, timestamp_ms: int) -> FrameState:
         """
         Process a single frame and extract game state.
 
@@ -316,14 +322,16 @@ class VideoAnalyzer:
 
                 # Convert detections to serializable format
                 for det in raw_detections:
-                    detections.append({
-                        "class_name": det.class_name,
-                        "tile_x": det.tile_x,
-                        "tile_y": det.tile_y,
-                        "is_opponent": det.is_opponent,
-                        "is_on_field": det.is_on_field,
-                        "confidence": round(det.confidence, 3),
-                    })
+                    detections.append(
+                        {
+                            "class_name": det.class_name,
+                            "tile_x": det.tile_x,
+                            "tile_y": det.tile_y,
+                            "is_opponent": det.is_opponent,
+                            "is_on_field": det.is_on_field,
+                            "confidence": round(det.confidence, 3),
+                        }
+                    )
 
                 # Extract hand cards
                 hand_cards = [
@@ -336,32 +344,71 @@ class VideoAnalyzer:
                     print(f"Detection error at frame {frame_num}: {e}")
 
         # Detect player elixir
+        try:
+            res = self._ui_regions.align_elixir_to_image(frame)
+            if self.verbose and res is not None:
+                print(f"[ElixirDebug] frame={frame_num} -> align result={res}")
+        except Exception:
+            pass
+
         elixir_result = self._digit_detector.detect_elixir(
-            frame,
-            self._ui_regions.elixir_number.to_tuple()
+            frame, self._ui_regions.elixir_number.to_tuple()
         )
         player_elixir = self._player_tracker.update(
             elixir_result.value if elixir_result.detected else -1,
-            elixir_result.confidence
+            elixir_result.confidence,
         )
 
-        # Detect timer (optional)
+        # Detect timer (optional). If the crop is black, realign timer ROI
+        # using a heuristic that scans for the rightmost non-black column.
+        try:
+            # current timer tuple
+            t_x1, t_y1, t_x2, t_y2 = self._ui_regions.timer.to_tuple()
+            roi = frame[t_y1:t_y2, t_x1:t_x2]
+            black_mean = None
+            if roi.size > 0:
+                import numpy as _np
+
+                gray_roi = _np.mean(roi, axis=2) if roi.ndim == 3 else roi
+                black_mean = float(_np.mean(gray_roi))
+
+            if black_mean is None or black_mean < 12:
+                # Heuristic adjust
+                try:
+                    result = self._ui_regions.align_timer_to_image(frame)
+                    if self.verbose:
+                        print(
+                            f"[TimerDebug] frame={frame_num} old_mean={black_mean} -> align result={result}"
+                        )
+                except Exception as exc:
+                    if self.verbose:
+                        print(f"[TimerDebug] align_timer_to_image failed: {exc}")
+
+        except Exception:
+            # Fail-safe: continue with existing ROI
+            pass
+
         game_time = self._digit_detector.detect_timer(
-            frame,
-            self._ui_regions.timer.to_tuple()
+            frame, self._ui_regions.timer.to_tuple()
         )
 
-        # Detect multiplier icon
+        # Detect multiplier icon (x2/x3).
+        try:
+            res = self._ui_regions.align_multiplier_to_image(frame)
+            if self.verbose and res is not None:
+                print(f"[MultiplierDebug] frame={frame_num} -> align result={res}")
+        except Exception:
+            pass
+
         multiplier = self._digit_detector.detect_multiplier_icon(
-            frame,
-            self._ui_regions.multiplier_icon.to_tuple()
+            frame, self._ui_regions.multiplier_icon.to_tuple()
         )
 
         # Update game phase
         game_phase = self._phase_tracker.update(
             multiplier_detected=multiplier,
             timer_seconds=game_time,
-            timestamp_ms=timestamp_ms
+            timestamp_ms=timestamp_ms,
         )
 
         # Get opponent detections for elixir tracking
@@ -382,21 +429,23 @@ class VideoAnalyzer:
         opponent_elixir = self._opponent_tracker.update(
             timestamp_ms=timestamp_ms,
             game_phase=game_phase,
-            opponent_detections=opponent_det_proxies
+            opponent_detections=opponent_det_proxies,
         )
 
         # Extract tower detections from Roboflow results
         tower_dets = []
         for det in raw_detections:
             if "tower" in det.class_name:
-                tower_dets.append({
-                    "class_name": det.class_name,
-                    "pixel_x": det.pixel_x,
-                    "pixel_y": det.pixel_y,
-                    "pixel_width": det.pixel_width,
-                    "pixel_height": det.pixel_height,
-                    "is_opponent": det.is_opponent,
-                })
+                tower_dets.append(
+                    {
+                        "class_name": det.class_name,
+                        "pixel_x": det.pixel_x,
+                        "pixel_y": det.pixel_y,
+                        "pixel_width": det.pixel_width,
+                        "pixel_height": det.pixel_height,
+                        "is_opponent": det.is_opponent,
+                    }
+                )
 
         # Detect tower levels from king towers (once)
         if not self._levels_detected and tower_dets:
@@ -404,8 +453,10 @@ class VideoAnalyzer:
                 if "king" in td["class_name"]:
                     level = self._health_detector.detect_tower_level(
                         frame,
-                        td["pixel_x"], td["pixel_y"],
-                        td["pixel_width"], td["pixel_height"],
+                        td["pixel_x"],
+                        td["pixel_y"],
+                        td["pixel_width"],
+                        td["pixel_height"],
                         td["is_opponent"],
                     )
                     if td["is_opponent"]:
@@ -418,7 +469,8 @@ class VideoAnalyzer:
         tower_health = {}
         if tower_dets:
             tower_health = self._health_detector.detect_all_towers(
-                frame, tower_dets,
+                frame,
+                tower_dets,
                 player_level=self._player_level,
                 opponent_level=self._opponent_level,
             )
@@ -437,7 +489,9 @@ class VideoAnalyzer:
             tower_data = {
                 "hp_current": th.hp_current,
                 "hp_max": th.hp_max,
-                "health_percent": round(th.health_percent, 1) if th.health_percent is not None else None,
+                "health_percent": round(th.health_percent, 1)
+                if th.health_percent is not None
+                else None,
                 "is_destroyed": th.is_destroyed,
             }
             if name.startswith("player_"):
@@ -475,19 +529,34 @@ class VideoAnalyzer:
         def draw_text(img, text, pos, color=color):
             (w, h), _ = cv2.getTextSize(text, font, font_scale, thickness)
             x, y = pos
-            cv2.rectangle(img, (x-2, y-h-2), (x+w+2, y+2), bg_color, -1)
+            cv2.rectangle(img, (x - 2, y - h - 2), (x + w + 2, y + 2), bg_color, -1)
             cv2.putText(img, text, pos, font, font_scale, color, thickness)
 
         # Frame info
         draw_text(annotated, f"Frame: {frame_num}", (10, 30))
-        draw_text(annotated, f"Time: {state.timestamp_ms/1000:.1f}s", (10, 55))
+        draw_text(annotated, f"Time: {state.timestamp_ms / 1000:.1f}s", (10, 55))
 
         # Elixir info
-        draw_text(annotated, f"Player Elixir: {state.player_elixir}", (10, 85), (255, 100, 255))
-        draw_text(annotated, f"Opp Elixir: {state.opponent_elixir_estimated:.1f}", (10, 110), (100, 100, 255))
+        draw_text(
+            annotated,
+            f"Player Elixir: {state.player_elixir}",
+            (10, 85),
+            (255, 100, 255),
+        )
+        draw_text(
+            annotated,
+            f"Opp Elixir: {state.opponent_elixir_estimated:.1f}",
+            (10, 110),
+            (100, 100, 255),
+        )
 
         # Game phase
-        draw_text(annotated, f"Phase: {state.game_phase} (x{state.elixir_multiplier})", (10, 140), (100, 255, 100))
+        draw_text(
+            annotated,
+            f"Phase: {state.game_phase} (x{state.elixir_multiplier})",
+            (10, 140),
+            (100, 255, 100),
+        )
 
         # Detection count
         draw_text(annotated, f"Detections: {len(state.detections)}", (10, 170))
@@ -518,10 +587,14 @@ class VideoAnalyzer:
             "max_player_elixir": max_player_elixir,
             "max_opponent_elixir_estimated": round(max_opponent_elixir, 2),
             "total_detections": total_detections,
-            "opponent_cards_played": self._opponent_tracker.total_cards_played if self._opponent_tracker else 0,
+            "opponent_cards_played": self._opponent_tracker.total_cards_played
+            if self._opponent_tracker
+            else 0,
             "avg_opponent_card_cost": round(
-                self._opponent_tracker.average_elixir_per_card if self._opponent_tracker else 0,
-                2
+                self._opponent_tracker.average_elixir_per_card
+                if self._opponent_tracker
+                else 0,
+                2,
             ),
         }
 
@@ -530,34 +603,18 @@ def main():
     """CLI entry point for video analysis."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Analyze Clash Royale game recordings"
+    parser = argparse.ArgumentParser(description="Analyze Clash Royale game recordings")
+    parser.add_argument("video_path", help="Path to video file to analyze")
+    parser.add_argument(
+        "--frame-skip", type=int, default=6, help="Process every Nth frame (default: 6)"
     )
     parser.add_argument(
-        "video_path",
-        help="Path to video file to analyze"
+        "--save-frames", action="store_true", help="Save annotated frames as images"
     )
     parser.add_argument(
-        "--frame-skip",
-        type=int,
-        default=6,
-        help="Process every Nth frame (default: 6)"
+        "--output-dir", default="output", help="Output directory (default: output)"
     )
-    parser.add_argument(
-        "--save-frames",
-        action="store_true",
-        help="Save annotated frames as images"
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="output",
-        help="Output directory (default: output)"
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suppress progress output"
-    )
+    parser.add_argument("--quiet", action="store_true", help="Suppress progress output")
 
     args = parser.parse_args()
 
@@ -565,7 +622,7 @@ def main():
         frame_skip=args.frame_skip,
         save_annotated_frames=args.save_frames,
         output_dir=args.output_dir,
-        verbose=not args.quiet
+        verbose=not args.quiet,
     )
 
     analyzer.analyze_video(args.video_path)
