@@ -7,10 +7,9 @@ the JSON files so is_on_field is set correctly based on class name patterns.
 """
 
 import argparse
-import json
 import glob
+import json
 from pathlib import Path
-
 
 IN_HAND_KEYWORDS = ["in-hand", "in_hand", "inhand"]
 NEXT_CARD_KEYWORDS = ["next-card", "next_card", "nextcard"]
@@ -54,8 +53,16 @@ def patch_frame(frame: dict) -> dict:
 
 
 def patch_json_file(json_path: Path, dry_run: bool = False) -> tuple[int, int]:
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            text = f.read()
+            if not text or not text.strip():
+                print(f"Warning: {json_path} is empty; skipping.")
+                return 0, 0
+            data = json.loads(text)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"Warning: could not parse {json_path}: {e}; skipping.")
+        return 0, 0
 
     patched_frames = 0
     patched_detections = 0
