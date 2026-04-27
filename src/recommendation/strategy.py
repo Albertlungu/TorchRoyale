@@ -275,12 +275,13 @@ class DTStrategy:
             return None
 
         # The model was trained with exactly 4 hand positions (0-3).
-        # Roboflow occasionally detects a 5th "next card" slot; ignore it.
+        # Only consider actual in-hand cards (not towers, not -next preview slots).
         _MAX_HAND = 4
         affordable_indices = [
             i
             for i, card in enumerate(hand_cards)
             if i < _MAX_HAND
+            and "-in-hand" in card
             and get_elixir_cost(card) <= player_elixir
             and get_elixir_cost(card) > 0
         ]

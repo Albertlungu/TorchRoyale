@@ -108,7 +108,7 @@ class DecisionTransformerDataset(Dataset):
 
             # Normalized RTG
             raw_rtg = ep.returns_to_go[start + i]
-            returns_to_go[pad + i, 0] = (raw_rtg - self.rtg_mean) / self.rtg_std
+            returns_to_go[pad + i, 0] = float((raw_rtg - self.rtg_mean) / self.rtg_std)
 
         # Data augmentation (training only, controlled by std > 0)
         if self.state_noise_std > 0:
