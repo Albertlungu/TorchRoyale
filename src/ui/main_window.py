@@ -52,6 +52,23 @@ class MainWindow(QMainWindow):
         set_styles(self)
         start_play_button_animation(self)
         self.log_message.connect(self._append_log_message)
+        self._configure_runtime_state()
+
+    def _configure_runtime_state(self) -> None:
+        """Reflect whether a live bot backend is available in this session."""
+        if self.bot_factory is not None:
+            return
+
+        self.start_stop_button.setEnabled(False)
+        self.play_pause_button.setEnabled(False)
+        self.start_stop_button.setToolTip(
+            "Live bot backend has not been migrated into TorchRoyale yet."
+        )
+        self.server_id_label.setText("Status: UI only")
+        self.append_log(
+            "Live bot backend is not configured for TorchRoyale yet. "
+            "UI controls are disabled."
+        )
 
     def log_handler_function(self, message: str) -> None:
         self.log_message.emit(message)
@@ -83,7 +100,6 @@ class MainWindow(QMainWindow):
         if self.is_running:
             return
         if self.bot_factory is None:
-            self.append_log("No bot factory configured for TorchRoyale UI.")
             return
 
         self.update_config()
