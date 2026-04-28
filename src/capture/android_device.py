@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from PIL import Image
+from PIL import UnidentifiedImageError
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +32,7 @@ class AndroidDevice:
 
         self._ensure_server()
         self.device_serial = self._resolve_device_serial(self.device_serial)
+        self._verify_device_ready()
 
     @staticmethod
     def _resolve_adb_path() -> str:
@@ -73,6 +75,19 @@ class AndroidDevice:
         )
         return result.stdout
 
+    def _run_process(
+        self,
+        args: list[str],
+        timeout: int = 15,
+    ) -> subprocess.CompletedProcess:
+        command = self._base_command() + args
+        return subprocess.run(
+            command,
+            capture_output=True,
+            timeout=timeout,
+            check=True,
+        )
+
     def _ensure_server(self) -> None:
         subprocess.run([self._adb_path, "start-server"], capture_output=True, check=False)
         if self.ip:
@@ -113,6 +128,19 @@ class AndroidDevice:
             raise RuntimeError("No connected Android devices found via adb.")
         return devices[0]
 
+    def _verify_device_ready(self) -> None:
+        state = self._run(["get-state"], timeout=10)
+        if state != "device":
+            raise RuntimeError(f"ADB device is not ready: {state}")
+
+    @staticmethod
+    def _extract_png_payload(raw: bytes) -> bytes:
+        png_header = b"\x89PNG\r\n\x1a\n"
+        start = raw.find(png_header)
+        if start == -1:
+            return raw
+        return raw[start:]
+
     def click(self, x: int, y: int) -> None:
         self._run(["shell", "input", "tap", str(x), str(y)])
 
@@ -131,11 +159,36 @@ class AndroidDevice:
         self._run(["shell", "am", "force-stop", "com.supercell.clashroyale"])
 
     def take_screenshot(self) -> Image.Image:
-        raw = self._run_bytes(["exec-out", "screencap", "-p"], timeout=20)
-        if not raw:
-            raise RuntimeError("ADB returned an empty screenshot.")
-        image = Image.open(io.BytesIO(raw.replace(b"\r\n", b"\n"))).convert("RGB")
-        return image.resize(self.screenshot_size, Image.Resampling.BICUBIC)
+        commands = [
+            ["exec-out", "screencap", "-p"],
+            ["shell", "screencap", "-p"],
+        ]
+        errors = []
+
+        for command in commands:
+            try:
+                result = self._run_process(command, timeout=20)
+                raw = result.stdout
+                if command[0] == "shell":
+                    raw = raw.replace(b"\r\n", b"\n")
+                raw = self._extract_png_payload(raw)
+                if not raw:
+                    raise RuntimeError("ADB returned an empty screenshot payload.")
+
+                image = Image.open(io.BytesIO(raw)).convert("RGB")
+                return image.resize(self.screenshot_size, Image.Resampling.BICUBIC)
+            except (subprocess.CalledProcessError, UnidentifiedImageError, OSError) as exc:
+                stderr = b""
+                if isinstance(exc, subprocess.CalledProcessError):
+                    stderr = exc.stderr or b""
+                preview = raw[:120] if "raw" in locals() else b""
+                errors.append(
+                    f"{' '.join(command)} failed: {exc}. "
+                    f"stderr={stderr.decode('utf-8', errors='ignore').strip()} "
+                    f"stdout={preview.decode('utf-8', errors='ignore').strip()}"
+                )
+
+        raise RuntimeError("Unable to capture screenshot via adb. " + " | ".join(errors))
 
     def load_deck(self, card_ids: list[int]) -> None:
         deck_ids = ";".join(str(card_id) for card_id in card_ids)

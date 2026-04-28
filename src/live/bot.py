@@ -174,13 +174,16 @@ class TorchRoyaleBot:
         return False
 
     def run(self) -> None:
-        self._log("TorchRoyale live bot started.")
+        started = False
         while self.should_run:
             if not self.pause_event.is_set():
                 time.sleep(0.1)
                 continue
 
             screenshot = self.device.take_screenshot()
+            if not started:
+                self._log("TorchRoyale live bot started.")
+                started = True
             state = self.detector.run(screenshot)
             self.visualizer.run(screenshot, state)
 
