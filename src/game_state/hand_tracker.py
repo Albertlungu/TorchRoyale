@@ -70,7 +70,7 @@ class HandTracker:
             if det.get("is_opponent"):
                 continue
             name = det.get("class_name", "")
-            if det.get("is_on_field"):
+            if det.get("is_on_field") and "-next" not in name.lower():
                 on_field_ids.add((
                     _base(name),
                     int(det.get("tile_x", 0)),

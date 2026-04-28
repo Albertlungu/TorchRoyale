@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 IN_HAND_KEYWORDS = ["in-hand", "in_hand", "inhand"]
-NEXT_CARD_KEYWORDS = ["next-card", "next_card", "nextcard"]
+NEXT_CARD_KEYWORDS = ["next-card", "next_card", "nextcard", "-next"]
 
 
 def is_card_in_hand(class_name: str) -> bool:
