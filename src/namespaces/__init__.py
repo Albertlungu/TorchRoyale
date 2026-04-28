@@ -1,6 +1,7 @@
 """TorchRoyale data namespaces."""
 
 from src.namespaces.cards import Card
+from src.namespaces.cards import CARD_OBJECTS
 from src.namespaces.cards import Cards
 from src.namespaces.cards import NAME2CARD
 from src.namespaces.numbers import NumberDetection
@@ -15,9 +16,11 @@ from src.namespaces.units import Transport
 from src.namespaces.units import Unit
 from src.namespaces.units import UnitCategory
 from src.namespaces.units import UnitDetection
+from src.namespaces.units import UNIT_OBJECTS
 from src.namespaces.units import Units
 
 __all__ = [
+    "CARD_OBJECTS",
     "Card",
     "Cards",
     "NAME2CARD",
@@ -33,5 +36,6 @@ __all__ = [
     "Unit",
     "UnitCategory",
     "UnitDetection",
+    "UNIT_OBJECTS",
     "Units",
 ]

@@ -287,3 +287,6 @@ class _CardsNamespace:
 
 Cards = _CardsNamespace()
 NAME2CARD = dict(asdict(Cards).items())
+CARD_OBJECTS = {
+    card.name: card for card in Cards.__dict__.values() if isinstance(card, Card)
+}

@@ -15,6 +15,6 @@ class State:
     allies: List[UnitDetection]
     enemies: List[UnitDetection]
     numbers: Numbers
-    cards: Tuple[Card, Card, Card, Card]
+    cards: Tuple[Card, ...]
     ready: List[int]
     screen: Screen

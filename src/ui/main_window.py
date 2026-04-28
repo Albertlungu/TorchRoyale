@@ -164,6 +164,8 @@ class MainWindow(QMainWindow):
             if frame_ready is not None and hasattr(frame_ready, "connect"):
                 frame_ready.connect(self.visualize_tab.update_frame)
             self.bot.run()
+        except Exception as exc:
+            self.append_log(f"Bot error: {exc}")
         finally:
             self.stop_bot()
 

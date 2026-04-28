@@ -345,3 +345,6 @@ class _UnitsNamespace:
 
 Units = _UnitsNamespace()
 NAME2UNIT = dict(asdict(Units).items())
+UNIT_OBJECTS = {
+    unit.name: unit for unit in Units.__dict__.values() if isinstance(unit, Unit)
+}
