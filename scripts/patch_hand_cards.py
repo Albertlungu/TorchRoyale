@@ -53,11 +53,14 @@ def process_file(path: Path, dry_run: bool = False) -> bool:
 
     tracker = HandTracker()
     changed = False
-    for fr in data["frames"]:
+    frames = data["frames"]
+    n = len(frames)
+    for i, fr in enumerate(frames):
         tracked = tracker.update(fr.get("detections", []))
         if fr.get("hand_cards") != tracked:
             fr["hand_cards"] = tracked
             changed = True
+        print(f"  [{i+1}/{n}] ts={fr.get('timestamp_ms')}ms  hand={tracked}", flush=True)
 
     if not changed:
         print(f"  No changes")
