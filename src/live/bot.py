@@ -81,14 +81,14 @@ class TorchRoyaleBot:
             return cards
 
         return [
-            Cards.HOG_RIDER,
+            Cards.MINIONS,
             Cards.MUSKETEER,
-            Cards.ICE_GOLEM,
-            Cards.ICE_SPIRIT,
-            Cards.SKELETONS,
-            Cards.CANNON,
+            Cards.GIANT,
+            Cards.KNIGHT,
             Cards.FIREBALL,
-            Cards.THE_LOG,
+            Cards.ARROWS,
+            Cards.ARCHERS,
+            Cards.MINIPEKKA,
         ]
 
     def _log(self, message: str) -> None:
