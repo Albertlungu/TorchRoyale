@@ -22,7 +22,7 @@ Strategy
   "hog-rider" match the same slot.
 """
 
-from typing import List, Optional, Set
+from typing import List, Set, Tuple
 import re
 
 
@@ -43,8 +43,8 @@ class HandTracker:
     HAND_SIZE = 4
 
     def __init__(self):
-        self._hand: List[str] = []          # tracked hand (base names)
-        self._prev_on_field: Set[str] = set()  # base names on field last frame
+        self._hand: List[str] = []                      # tracked hand (base names)
+        self._prev_on_field: Set[Tuple] = set()         # (base, tile_x, tile_y) seen last frame
 
     def reset(self) -> None:
         self._hand = []
@@ -63,31 +63,36 @@ class HandTracker:
             always aiming for HAND_SIZE entries.
         """
         # --- Separate detections by type ---
-        in_hand_raw: List[str] = []     # raw class names with -in-hand
-        on_field_bases: Set[str] = set()
+        in_hand_raw: List[str] = []
+        on_field_ids: Set[Tuple] = set()   # (base_name, tile_x, tile_y)
 
         for det in detections:
             if det.get("is_opponent"):
                 continue
             name = det.get("class_name", "")
             if det.get("is_on_field"):
-                on_field_bases.add(_base(name))
+                on_field_ids.add((
+                    _base(name),
+                    int(det.get("tile_x", 0)),
+                    int(det.get("tile_y", 0)),
+                ))
             elif "-in-hand" in name.lower():
                 in_hand_raw.append(name)
 
         in_hand_bases = [_base(n) for n in in_hand_raw]
 
         # --- Detect play events ---
-        # A card was played if it was in our tracked hand and has just
-        # appeared on-field for the first time (not in prev_on_field).
-        newly_on_field = on_field_bases - self._prev_on_field
-        played_bases = {b for b in self._hand if b in newly_on_field}
+        # A card was played if a new (name, tile_x, tile_y) triple appears
+        # that wasn't present last frame and the base name was in our hand.
+        newly_on_field_ids = on_field_ids - self._prev_on_field
+        newly_on_field_bases = {b for b, _, _ in newly_on_field_ids}
+        played_bases = {b for b in self._hand if b in newly_on_field_bases}
 
         # --- Initialise tracked hand on first non-empty detection ---
         if not self._hand:
             if in_hand_bases:
                 self._hand = list(dict.fromkeys(in_hand_bases))[: self.HAND_SIZE]
-            self._prev_on_field = on_field_bases
+            self._prev_on_field = on_field_ids
             return self._to_in_hand(self._hand)
 
         # --- Remove played cards ---
@@ -103,7 +108,7 @@ class HandTracker:
         # --- If still short, fill from in-hand detections we already track ---
         # (handles the case where we see fewer than 4 but no play happened)
 
-        self._prev_on_field = on_field_bases
+        self._prev_on_field = on_field_ids
         return self._to_in_hand(self._hand)
 
     @staticmethod
