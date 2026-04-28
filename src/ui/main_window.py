@@ -1,11 +1,10 @@
-"""
-Main window for TorchRoyale GUI application.
+"""Main window for the TorchRoyale desktop UI."""
 
-Provides the primary application window with bot controls, logging,
-visualization, and settings tabs using PyQt6.
-"""
-
-from typing import Any, Dict, Optional
+from threading import Thread
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Optional
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QMainWindow
@@ -23,13 +22,18 @@ class MainWindow(QMainWindow):
 
     log_message = pyqtSignal(str)
 
-    def __init__(self, config: Dict[str, Any], actions: Optional[Any] = None) -> None:
-        """Initialize the main window."""
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        actions: Optional[Any] = None,
+        bot_factory: Optional[Callable[..., Any]] = None,
+    ) -> None:
         super().__init__()
         self.config = config
         self.actions = actions
+        self.bot_factory = bot_factory
         self.bot: Optional[Any] = None
-        self.bot_thread: Optional[Any] = None
+        self.bot_thread: Optional[Thread] = None
         self.is_running = False
 
         self.setWindowTitle("TorchRoyale")
@@ -50,18 +54,14 @@ class MainWindow(QMainWindow):
         self.log_message.connect(self._append_log_message)
 
     def log_handler_function(self, message: str) -> None:
-        """Handle log messages from the bot."""
         self.log_message.emit(message)
 
     def _append_log_message(self, formatted_message: str) -> None:
-        """Append a formatted log message to the log display."""
         self.log_display.append(formatted_message)
-        self.log_display.verticalScrollBar().setValue(
-            self.log_display.verticalScrollBar().maximum()
-        )
+        scrollbar = self.log_display.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def toggle_start_stop(self) -> None:
-        """Toggle between starting and stopping the bot."""
         if self.is_running:
             self.stop_bot()
             self.glow_animation.start()
@@ -70,62 +70,58 @@ class MainWindow(QMainWindow):
             self.glow_animation.stop()
 
     def toggle_pause_resume_and_display(self) -> None:
-        """Toggle between pause and resume states."""
-        if not self.bot:
+        if not self.bot or not hasattr(self.bot, "pause_or_resume"):
             return
-        if self.bot.pause_event.is_set():
+        pause_event = getattr(self.bot, "pause_event", None)
+        if pause_event is not None and pause_event.is_set():
             self.play_pause_button.setText("▶")
         else:
-            self.play_pause_button.setText("⏸️")
+            self.play_pause_button.setText("⏸")
         self.bot.pause_or_resume()
 
     def start_bot(self) -> None:
-        """Start the bot in a separate thread."""
         if self.is_running:
             return
+        if self.bot_factory is None:
+            self.append_log("No bot factory configured for TorchRoyale UI.")
+            return
+
         self.update_config()
         self.is_running = True
-        self.bot_thread = Thread(target=self.bot_task)
-        self.bot_thread.daemon = True
+        self.bot_thread = Thread(target=self.bot_task, daemon=True)
         self.bot_thread.start()
         self.start_stop_button.setText("■")
         self.play_pause_button.show()
-        self.server_id_label.setText("Status - Running")
+        self.server_id_label.setText("Status: Running")
 
     def stop_bot(self) -> None:
-        """Stop the running bot."""
-        if self.bot:
+        if self.bot and hasattr(self.bot, "stop"):
             self.bot.stop()
         self.is_running = False
         self.start_stop_button.setText("▶")
         self.play_pause_button.hide()
-        self.server_id_label.setText("Status - Stopped")
+        self.server_id_label.setText("Status: Stopped")
 
     def restart_bot(self) -> None:
-        """Restart the bot by stopping and starting again."""
         if self.is_running:
             self.stop_bot()
         self.update_config()
         self.start_bot()
 
     def update_config(self) -> Dict[str, Any]:
-        """Update configuration from UI controls."""
-        self.config["visuals"][
-            "save_labels"
-        ] = self.save_labels_checkbox.isChecked()
-        self.config["visuals"][
-            "save_images"
-        ] = self.save_images_checkbox.isChecked()
-        self.config["visuals"][
-            "show_images"
-        ] = self.show_images_checkbox.isChecked()
-        self.visualize_tab.update_active_state(
-            self.config["visuals"]["show_images"]
-        )
+        self.config.setdefault("visuals", {})
+        self.config.setdefault("bot", {})
+        self.config.setdefault("ingame", {})
+        self.config.setdefault("adb", {})
+
+        self.config["visuals"]["save_labels"] = self.save_labels_checkbox.isChecked()
+        self.config["visuals"]["save_images"] = self.save_images_checkbox.isChecked()
+        self.config["visuals"]["show_images"] = self.show_images_checkbox.isChecked()
+        self.visualize_tab.update_active_state(self.config["visuals"]["show_images"])
         self.config["bot"]["load_deck"] = self.load_deck_checkbox.isChecked()
-        self.config["bot"][
-            "auto_start_game"
-        ] = self.auto_start_game_checkbox.isChecked()
+        self.config["bot"]["auto_start_game"] = (
+            self.auto_start_game_checkbox.isChecked()
+        )
         self.config["bot"]["log_level"] = self.log_level_dropdown.currentText()
         self.config["ingame"]["play_action"] = round(
             float(self.play_action_delay_input.value()), 2
@@ -134,19 +130,26 @@ class MainWindow(QMainWindow):
         self.config["adb"]["device_serial"] = self.device_serial_input.text()
         return self.config
 
-    def bot_task(self) -> None:
-        """Run the bot task in a separate thread."""
+    def _build_bot_instance(self) -> Any:
         try:
-            self.bot = Bot(actions=self.actions, config=self.config)
-            self.bot.visualizer.frame_ready.connect(
-                self.visualize_tab.update_frame
+            return self.bot_factory(
+                actions=self.actions,
+                config=self.config,
+                log_handler=self.log_handler_function,
             )
+        except TypeError:
+            return self.bot_factory(self.actions, self.config)
+
+    def bot_task(self) -> None:
+        try:
+            self.bot = self._build_bot_instance()
+            visualizer = getattr(self.bot, "visualizer", None)
+            frame_ready = getattr(visualizer, "frame_ready", None)
+            if frame_ready is not None and hasattr(frame_ready, "connect"):
+                frame_ready.connect(self.visualize_tab.update_frame)
             self.bot.run()
+        finally:
             self.stop_bot()
-        except Exception as e:
-            self.stop_bot()
-            raise
 
     def append_log(self, message: str) -> None:
-        """Append a message to the log display."""
         self.log_display.append(message)
