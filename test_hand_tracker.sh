@@ -1,16 +1,17 @@
 #!/bin/bash
-# Test the HandTracker branch on Game 2
-# Run this in one terminal while test_vlm.sh runs in another
-
 set -e
+
 REPO="$(cd "$(dirname "$0")" && pwd)"
-VENV="/Users/albertlungu/Local/GitHub/TorchRoyale/venv/bin/python3"
-mkdir -p "$REPO/logs"
+MAIN="/Users/albertlungu/Local/GitHub/TorchRoyale"
+VENV="$MAIN/venv/bin/python3"
+
+mkdir -p "$MAIN/logs"
+cd "$MAIN"
 
 echo "=== Branch: feature/hand-tracker ==="
 echo "=== Patching hand_cards using HandTracker ==="
 
-$VENV scripts/patch_hand_cards.py \
+$VENV "$REPO/scripts/patch_hand_cards.py" \
     --analyses-dir output/analysis \
     2>&1 | tee logs/test_hand_tracker.log
 
