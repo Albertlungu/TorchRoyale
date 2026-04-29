@@ -28,10 +28,6 @@ from src.detection.result import Detection, FrameDetections
 from src.grid.coordinate_mapper import CoordinateMapper
 
 _WEIGHTS_DIR = Path(__file__).parents[2] / "data/models/katacr"
-_GDRIVE_IDS = {
-    "detector1_v0.7.13.pt": "1DMD-EYXa1qn8lN4JjPQ7UIuOMwaqS5w_",
-    "detector2_v0.7.13.pt": "1yEq-6liLhs_pUfipJM1E-tMj6l4FSbxD",
-}
 
 # part2 crop params per aspect-ratio bucket (x, y, w, h as fractions of game strip)
 _PART2_PARAMS = {
@@ -50,21 +46,6 @@ _SUFFIX_RE = re.compile(
 def _base(name: str) -> str:
     return _SUFFIX_RE.sub("", name.lower()).strip()
 
-
-def _download_weights() -> None:
-    """Download KataCR weights from Google Drive if not present."""
-    try:
-        import gdown  # type: ignore
-    except ImportError:
-        raise RuntimeError(
-            "pip install gdown   # required to auto-download KataCR weights"
-        )
-    _WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
-    for fname, gid in _GDRIVE_IDS.items():
-        dest = _WEIGHTS_DIR / fname
-        if not dest.exists():
-            print(f"[KataCR] Downloading {fname} ...")
-            gdown.download(id=gid, output=str(dest), quiet=False)
 
 
 class KataCRDetector:
@@ -100,8 +81,12 @@ class KataCRDetector:
             return
         w1 = _WEIGHTS_DIR / "detector1_v0.7.13.pt"
         w2 = _WEIGHTS_DIR / "detector2_v0.7.13.pt"
-        if not w1.exists() or not w2.exists():
-            _download_weights()
+        for w in (w1, w2):
+            if not w.exists():
+                raise FileNotFoundError(
+                    f"KataCR weight not found: {w}\n"
+                    f"Place detector1_v0.7.13.pt and detector2_v0.7.13.pt in {_WEIGHTS_DIR}"
+                )
         from ultralytics import YOLO  # type: ignore
         self._models = [
             YOLO(str(w1)).to(self._device),

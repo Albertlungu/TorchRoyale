@@ -1,8 +1,6 @@
 torch
 torchvision
-numpy
+ultralytics
 opencv-python
 easyocr
-gdown
-ultralytics
-inference
+numpy

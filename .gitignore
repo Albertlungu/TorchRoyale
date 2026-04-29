@@ -1,0 +1,21 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.egg-info/
+dist/
+build/
+.env
+
+# Data — replays and models tracked via LFS or manually
+data/replays/
+data/models/dt/
+
+# Outputs — not tracked
+output/
+logs/
+
+# Temporary files
+*.tmp
+*.log
