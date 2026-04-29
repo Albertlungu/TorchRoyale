@@ -9,9 +9,10 @@ Model weights are stored at data/models/katacr/ and downloaded on first
 use from Google Drive if absent.
 
 KataCR output format per detection:
-  [x1, y1, x2, y2, conf, cls_idx, bel]
-  bel: 0 = player (friend), 1 = opponent (enemy)
+  [x1, y1, x2, y2, conf, cls_idx]
   Coordinates are in the part2 crop (576×896), not the full frame.
+  is_opponent is derived from tile_y: units spawning above PLAYER_SIDE_MIN_ROW
+  belong to the opponent and retain that label even after crossing the river.
 
 Screen partitioning for portrait-in-landscape (ratio ~2.16):
   part2 crop: x=2.1%, y=7.3%, w=96%, h=70% of the game content strip
@@ -22,10 +23,23 @@ Public API:
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+# KataCR weights were saved with a custom YOLOv8 subclass. The katacr source
+# tree must be on sys.path so torch can unpickle the checkpoint. We look for
+# it next to this repo (cloned as "KataCR") and fall back to /tmp/katacr_repo.
+_KATACR_SRC_CANDIDATES = [
+    Path(__file__).parents[2].parent / "KataCR",
+    Path("/tmp/katacr_repo"),
+]
+for _candidate in _KATACR_SRC_CANDIDATES:
+    if _candidate.is_dir() and str(_candidate) not in sys.path:
+        sys.path.insert(0, str(_candidate))
+        break
 
 from src.detection.result import Detection, FrameDetections
 from src.grid.coordinate_mapper import CoordinateMapper
@@ -195,7 +209,7 @@ class KataCRDetector:
             part2: resized arena crop (576×896 BGR).
 
         Returns:
-            Nx7 float array: [x1, y1, x2, y2, conf, cls_idx, bel].
+            Nx6 float array: [x1, y1, x2, y2, conf, cls_idx].
         """
         import torch  # pylint: disable=import-outside-toplevel
         import torchvision  # pylint: disable=import-outside-toplevel
@@ -210,13 +224,10 @@ class KataCRDetector:
             )
             if results and results[0].boxes is not None:
                 boxes = results[0].boxes.data.clone()  # (N, 6): xyxy, conf, cls
-                # Append a dummy bel=0 column so we have 7 cols
-                bel = torch.zeros(len(boxes), 1, device=boxes.device)
-                boxes = torch.cat([boxes, bel], dim=1)
                 preds.append(boxes)
 
         if not preds:
-            return np.zeros((0, 7))
+            return np.zeros((0, 6))
 
         all_preds = torch.cat(preds, dim=0)
         keep = torchvision.ops.nms(all_preds[:, :4], all_preds[:, 4], self.IOU_THRESHOLD)
@@ -251,10 +262,12 @@ class KataCRDetector:
         scale_x = (x_right - x_left) * crop_w / part2_w
         scale_y = (y_bot - y_top) * crop_h / part2_h
 
+        from src.constants.game import PLAYER_SIDE_MIN_ROW  # pylint: disable=import-outside-toplevel
+
         for row in raw:
-            bx1, by1, bx2, by2, conf, cls_idx, bel = (
+            bx1, by1, bx2, by2, conf, cls_idx = (
                 float(row[0]), float(row[1]), float(row[2]),
-                float(row[3]), float(row[4]), int(row[5]), int(row[6]),
+                float(row[3]), float(row[4]), int(row[5]),
             )
             # Convert part2 pixels → full frame pixels
             fx1 = crop_x + bx1 * scale_x
@@ -269,6 +282,10 @@ class KataCRDetector:
                 cx - x_left, cy - y_top
             )
 
+            # Units that spawn above the river belong to the opponent; they may
+            # cross into the player's half later but their origin side is fixed.
+            is_opponent = tile_row < PLAYER_SIDE_MIN_ROW
+
             names: Dict[int, str] = self._models[0].names  # type: ignore[index]
             raw_name = names.get(cls_idx, f"unit_{cls_idx}")
             card_name = _base(raw_name)
@@ -277,7 +294,7 @@ class KataCRDetector:
                 class_name=card_name,
                 tile_x=tile_col,
                 tile_y=tile_row,
-                is_opponent=bool(bel),
+                is_opponent=is_opponent,
                 is_on_field=True,
                 confidence=round(conf, 3),
                 bbox_px=(int(fx1), int(fy1), int(fx2), int(fy2)),
