@@ -1,10 +1,25 @@
-"""Game phase derived from the timer sequence."""
+"""
+Game phase derivation from the timer sequence.
+
+Determines whether each frame is in single-elixir, double-elixir, triple-elixir,
+or game-over phase. Overtime is inferred from a timer jump from near-zero back
+to a large value.
+
+Public API:
+  Phase          -- string enum of the four possible game phases
+  derive_phases() -- compute multiplier and phase lists from a timer sequence
+"""
 from __future__ import annotations
+
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Tuple
+
+from src.constants.game import DOUBLE_ELIXIR_START_S, TRIPLE_ELIXIR_START_S
 
 
 class Phase(str, Enum):
+    """The four mutually exclusive game phases."""
+
     SINGLE = "single"
     DOUBLE = "double"
     TRIPLE = "triple"
@@ -13,19 +28,23 @@ class Phase(str, Enum):
 
 def derive_phases(
     timer_filled: List[Optional[int]],
-) -> tuple[List[int], List[str]]:
+) -> Tuple[List[int], List[str]]:
     """
     Derive elixir_multiplier and game_phase for every frame from the
-    filled timer sequence. Overtime is detected by the timer jumping
-    from near-zero back to ≥100.
+    filled timer sequence.
+
+    Overtime is detected by the timer jumping from near-zero back to
+    a value >= 100 seconds.
+
+    Args:
+        timer_filled: per-frame timer values in seconds. None entries are
+                      forward-filled from the previous known value.
 
     Returns:
-        multipliers: list of int (1, 2, or 3)
-        phases:      list of str phase values
+        multipliers: list of int (1, 2, or 3), one per frame.
+        phases:      list of Phase string values, one per frame.
     """
-    from src.constants.game import DOUBLE_ELIXIR_START_S, TRIPLE_ELIXIR_START_S
-
-    in_overtime = False
+    in_overtime: bool = False
     prev: Optional[int] = None
     multipliers: List[int] = []
     phases: List[str] = []
@@ -35,8 +54,8 @@ def derive_phases(
             in_overtime = True
 
         if secs is None:
-            mult = multipliers[-1] if multipliers else 1
-            phase = phases[-1] if phases else Phase.SINGLE.value
+            mult: int = multipliers[-1] if multipliers else 1
+            phase: str = phases[-1] if phases else Phase.SINGLE.value
         elif secs <= 0:
             mult, phase = 1, Phase.GAME_OVER.value
         elif in_overtime:

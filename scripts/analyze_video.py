@@ -2,20 +2,30 @@
 """
 Analyze a replay video using KataCR detection.
 
+Writes a <stem>_analysis.json to the output directory containing per-frame
+game state (detections, OCR fields, hand cards).
+
 Usage:
-  python scripts/analyze_video.py data/replays/Game\ 1.mov
-  python scripts/analyze_video.py data/replays/Game\ 1.mov --frame-skip 6 --device mps
+  python scripts/analyze_video.py data/replays/Game\\ 1.mov
+  python scripts/analyze_video.py data/replays/Game\\ 1.mov --frame-skip 6 --device mps
 """
-import argparse, sys
+from __future__ import annotations
+
+import argparse
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from src.overlay.analyzer import VideoAnalyzer
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("video")
+def main() -> None:
+    """Parse arguments and run the video analyzer."""
+    parser = argparse.ArgumentParser(
+        description="Analyze a Clash Royale replay video with KataCR detection."
+    )
+    parser.add_argument("video", help="Path to the replay video file.")
     parser.add_argument("--output-dir", default="output/analysis")
     parser.add_argument("--frame-skip", type=int, default=6)
     parser.add_argument("--device", default="auto")

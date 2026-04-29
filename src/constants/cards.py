@@ -3,7 +3,18 @@ Card vocabulary: canonical names and elixir costs.
 
 Canonical names match KataCR's unit_list where possible, with additions
 for cards the project tracks that KataCR may not label.
+
+Public API:
+  ELIXIR_COSTS  -- dict mapping card name to elixir cost (None for Mirror)
+  CARD_NAMES    -- sorted list of all known card names (model vocabulary)
+  CARD_TO_IDX   -- card name → vocabulary index
+  IDX_TO_CARD   -- vocabulary index → card name
+  VOCAB_SIZE    -- total number of cards in vocabulary
+  elixir_cost() -- look up cost for a name, returns None if unknown
+  card_to_idx() -- look up vocabulary index for a name, returns 0 if unknown
 """
+from __future__ import annotations
+
 from typing import Dict, Optional
 
 # fmt: off
@@ -133,8 +144,8 @@ ELIXIR_COSTS: Dict[str, int] = {
 
 # Sorted list used as the model vocabulary
 CARD_NAMES = sorted(ELIXIR_COSTS.keys())
-CARD_TO_IDX: Dict[str, int] = {name: i for i, name in enumerate(CARD_NAMES)}
-IDX_TO_CARD: Dict[int, str] = {i: name for i, name in enumerate(CARD_NAMES)}
+IDX_TO_CARD: Dict[int, str] = dict(enumerate(CARD_NAMES))
+CARD_TO_IDX: Dict[str, int] = {name: idx for idx, name in IDX_TO_CARD.items()}
 VOCAB_SIZE = len(CARD_NAMES)
 
 

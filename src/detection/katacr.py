@@ -13,14 +13,17 @@ KataCR output format per detection:
   bel: 0 = player (friend), 1 = opponent (enemy)
   Coordinates are in the part2 crop (576×896), not the full frame.
 
-Screen partitioning for portrait-in-landscape (ratio ≈ 2.16):
+Screen partitioning for portrait-in-landscape (ratio ~2.16):
   part2 crop: x=2.1%, y=7.3%, w=96%, h=70% of the game content strip
+
+Public API:
+  KataCRDetector -- load weights once, calibrate from a frame, detect per frame
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -30,7 +33,7 @@ from src.grid.coordinate_mapper import CoordinateMapper
 _WEIGHTS_DIR = Path(__file__).parents[2] / "data/models/katacr"
 
 # part2 crop params per aspect-ratio bucket (x, y, w, h as fractions of game strip)
-_PART2_PARAMS = {
+_PART2_PARAMS: Dict[Tuple[float, float], Tuple[float, float, float, float]] = {
     (2.13, 2.14): (0.026, 0.048, 0.960, 0.710),
     (2.16, 2.18): (0.021, 0.073, 0.960, 0.700),
     (2.22, 2.24): (0.020, 0.070, 0.960, 0.690),
@@ -44,8 +47,8 @@ _SUFFIX_RE = re.compile(
 
 
 def _base(name: str) -> str:
+    """Strip known suffixes from a KataCR class name to get the base card name."""
     return _SUFFIX_RE.sub("", name.lower()).strip()
-
 
 
 class KataCRDetector:
@@ -56,17 +59,22 @@ class KataCRDetector:
     then call detect(frame) for each frame.
     """
 
-    CONF_THRESHOLD = 0.5
-    IOU_THRESHOLD = 0.6
+    CONF_THRESHOLD: float = 0.5
+    IOU_THRESHOLD: float = 0.6
 
-    def __init__(self, device: str = "auto"):
-        self._models = None
+    def __init__(self, device: str = "auto") -> None:
+        """
+        Args:
+            device: PyTorch device string ("auto", "cpu", "cuda", "mps").
+                    "auto" selects MPS > CUDA > CPU in that order.
+        """
+        self._models: Optional[List] = None
         self._mapper: Optional[CoordinateMapper] = None
-        self._game_strip: Optional[tuple] = None  # (x_left, x_right, y_top, y_bot)
-        self._part2_params: Optional[tuple] = None
+        self._game_strip: Optional[Tuple[int, int, int, int]] = None
+        self._part2_params: Optional[Tuple[float, float, float, float]] = None
 
         if device == "auto":
-            import torch
+            import torch  # pylint: disable=import-outside-toplevel
             if torch.backends.mps.is_available():
                 self._device = "mps"
             elif torch.cuda.is_available():
@@ -77,47 +85,53 @@ class KataCRDetector:
             self._device = device
 
     def _load(self) -> None:
+        """Lazily load both YOLO model weights from disk."""
         if self._models is not None:
             return
-        w1 = _WEIGHTS_DIR / "detector1_v0.7.13.pt"
-        w2 = _WEIGHTS_DIR / "detector2_v0.7.13.pt"
-        for w in (w1, w2):
-            if not w.exists():
+        weight1 = _WEIGHTS_DIR / "detector1_v0.7.13.pt"
+        weight2 = _WEIGHTS_DIR / "detector2_v0.7.13.pt"
+        for weight in (weight1, weight2):
+            if not weight.exists():
                 raise FileNotFoundError(
-                    f"KataCR weight not found: {w}\n"
+                    f"KataCR weight not found: {weight}\n"
                     f"Place detector1_v0.7.13.pt and detector2_v0.7.13.pt in {_WEIGHTS_DIR}"
                 )
-        from ultralytics import YOLO  # type: ignore
+        from ultralytics import YOLO  # type: ignore  # pylint: disable=import-outside-toplevel
         self._models = [
-            YOLO(str(w1)).to(self._device),
-            YOLO(str(w2)).to(self._device),
+            YOLO(str(weight1)).to(self._device),
+            YOLO(str(weight2)).to(self._device),
         ]
         print(f"[KataCR] Models loaded on {self._device}")
 
     def calibrate(self, frame: np.ndarray) -> None:
         """
-        Detect game content bounds and set up coordinate mapper.
-        Call once with a mid-game frame (not loading screen).
+        Detect game content bounds and set up the coordinate mapper.
+
+        Call once with a mid-game frame (not a loading screen) before
+        running detect().
+
+        Args:
+            frame: BGR image array from OpenCV.
         """
-        h, w = frame.shape[:2]
+        frame_h, frame_w = frame.shape[:2]
         gray = np.mean(frame, axis=2) if frame.ndim == 3 else frame
         cols = np.where(np.mean(gray, axis=0) > 30)[0]
         rows = np.where(np.mean(gray, axis=1) > 30)[0]
 
-        if cols.size > 0 and (cols.max() - cols.min()) < w * 0.80:
+        if cols.size > 0 and (cols.max() - cols.min()) < frame_w * 0.80:
             x_left, x_right = int(cols.min()), int(cols.max())
             y_top, y_bot = int(rows.min()), int(rows.max())
         else:
             x_left, y_top = 0, 0
-            x_right, y_bot = w, h
+            x_right, y_bot = frame_w, frame_h
 
         self._game_strip = (x_left, x_right, y_top, y_bot)
         game_h = max(1, y_bot - y_top)
         game_w = max(1, x_right - x_left)
         ratio = game_h / game_w
 
-        # Pick the closest part2 params
-        best_params = list(_PART2_PARAMS.values())[0]
+        # Pick the closest part2 params bucket
+        best_params: Tuple[float, float, float, float] = list(_PART2_PARAMS.values())[0]
         best_dist = float("inf")
         for (lo, hi), params in _PART2_PARAMS.items():
             mid = (lo + hi) / 2
@@ -133,7 +147,12 @@ class KataCRDetector:
     def detect(self, frame: np.ndarray) -> FrameDetections:
         """
         Run battlefield detection on one full video frame.
-        Returns FrameDetections with on_field populated.
+
+        Args:
+            frame: BGR image array from OpenCV.
+
+        Returns:
+            FrameDetections with on_field populated.
         """
         self._load()
         if self._mapper is None or self._game_strip is None:
@@ -141,35 +160,48 @@ class KataCRDetector:
 
         part2, crop_x, crop_y = self._crop_part2(frame)
         raw = self._run_combo(part2)
-        detections = self._parse(raw, part2.shape, crop_x, crop_y, frame.shape)
+        detections = self._parse(raw, part2.shape, crop_x, crop_y)
         return FrameDetections(on_field=detections)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _crop_part2(self, frame: np.ndarray):
-        """Crop the arena region from the full frame."""
-        import cv2
-        x_left, x_right, y_top, y_bot = self._game_strip
-        gw = x_right - x_left
-        gh = y_bot - y_top
-        x, y, w, h = self._part2_params
-        x1 = x_left + int(gw * x)
-        y1 = y_top + int(gh * y)
-        x2 = x_left + int(gw * (x + w))
-        y2 = y_top + int(gh * (y + h))
+    def _crop_part2(self, frame: np.ndarray) -> Tuple[np.ndarray, int, int]:
+        """
+        Crop and resize the arena region from the full frame.
+
+        Returns:
+            Tuple of (resized crop, crop x-offset in frame, crop y-offset in frame).
+        """
+        import cv2  # pylint: disable=import-outside-toplevel
+        x_left, x_right, y_top, y_bot = self._game_strip  # type: ignore[misc]
+        game_w = x_right - x_left
+        game_h = y_bot - y_top
+        cx, cy, cw, ch = self._part2_params  # type: ignore[misc]
+        x1 = x_left + int(game_w * cx)
+        y1 = y_top + int(game_h * cy)
+        x2 = x_left + int(game_w * (cx + cw))
+        y2 = y_top + int(game_h * (cy + ch))
         crop = frame[y1:y2, x1:x2]
         resized = cv2.resize(crop, (_PART2_TARGET_W, _PART2_TARGET_H))
         return resized, x1, y1
 
     def _run_combo(self, part2: np.ndarray) -> np.ndarray:
-        """Run both YOLO models, merge with NMS, return Nx7 array."""
-        import torch
-        import torchvision
+        """
+        Run both YOLO models on the arena crop and merge via NMS.
+
+        Args:
+            part2: resized arena crop (576×896 BGR).
+
+        Returns:
+            Nx7 float array: [x1, y1, x2, y2, conf, cls_idx, bel].
+        """
+        import torch  # pylint: disable=import-outside-toplevel
+        import torchvision  # pylint: disable=import-outside-toplevel
 
         preds = []
-        for model in self._models:
+        for model in self._models:  # type: ignore[union-attr]
             results = model.predict(
                 part2,
                 conf=self.CONF_THRESHOLD,
@@ -186,26 +218,38 @@ class KataCRDetector:
         if not preds:
             return np.zeros((0, 7))
 
-        preds = torch.cat(preds, dim=0)
-        keep = torchvision.ops.nms(preds[:, :4], preds[:, 4], self.IOU_THRESHOLD)
-        return preds[keep].cpu().numpy()
+        all_preds = torch.cat(preds, dim=0)
+        keep = torchvision.ops.nms(all_preds[:, :4], all_preds[:, 4], self.IOU_THRESHOLD)
+        return all_preds[keep].cpu().numpy()
 
     def _parse(
         self,
         raw: np.ndarray,
-        part2_shape: tuple,
+        part2_shape: Tuple[int, ...],
         crop_x: int,
         crop_y: int,
-        frame_shape: tuple,
     ) -> List[Detection]:
-        """Convert raw YOLO output to Detection objects in full-frame space."""
+        """
+        Convert raw YOLO output rows to Detection objects in full-frame space.
+
+        Args:
+            raw: Nx7 array from _run_combo.
+            part2_shape: shape of the resized arena crop (H, W, ...).
+            crop_x: x-offset of the crop within the full frame.
+            crop_y: y-offset of the crop within the full frame.
+
+        Returns:
+            List of Detection objects with tile coordinates.
+        """
         detections: List[Detection] = []
         if len(raw) == 0:
             return detections
 
-        ph, pw = part2_shape[:2]
-        scale_x = (self._game_strip[1] - self._game_strip[0]) * self._part2_params[2] / pw
-        scale_y = (self._game_strip[3] - self._game_strip[2]) * self._part2_params[3] / ph
+        x_left, x_right, y_top, y_bot = self._game_strip  # type: ignore[misc]
+        crop_w, crop_h = self._part2_params[2], self._part2_params[3]  # type: ignore[index]
+        part2_h, part2_w = part2_shape[:2]
+        scale_x = (x_right - x_left) * crop_w / part2_w
+        scale_y = (y_bot - y_top) * crop_h / part2_h
 
         for row in raw:
             bx1, by1, bx2, by2, conf, cls_idx, bel = (
@@ -218,15 +262,14 @@ class KataCRDetector:
             fx2 = crop_x + bx2 * scale_x
             fy2 = crop_y + by2 * scale_y
 
-            # Centre pixel → tile
+            # Centre pixel → tile (use game-strip-relative coords)
             cx = int((fx1 + fx2) / 2)
             cy = int((fy1 + fy2) / 2)
-            # Adjust to game-strip-relative coords for tile mapping
-            x_left, _, y_top, _ = self._game_strip
-            tile_col, tile_row = self._mapper.pixel_to_tile(cx - x_left, cy - y_top)
+            tile_col, tile_row = self._mapper.pixel_to_tile(  # type: ignore[union-attr]
+                cx - x_left, cy - y_top
+            )
 
-            # Class name from model
-            names = self._models[0].names
+            names: Dict[int, str] = self._models[0].names  # type: ignore[index]
             raw_name = names.get(cls_idx, f"unit_{cls_idx}")
             card_name = _base(raw_name)
 
