@@ -19,7 +19,14 @@ from ..constants.game_constants import (
 
 @dataclass
 class CardPlayEvent:
-    """Records when a card is played."""
+    """Records when a card is played.
+
+    Attributes:
+        timestamp_ms (int): Timestamp in milliseconds when card was played.
+        card_name (str): Name of the card that was played.
+        elixir_cost (int): Elixir cost of the played card.
+        is_opponent (bool): Whether the opponent played this card.
+    """
     timestamp_ms: int
     card_name: str
     elixir_cost: int
@@ -28,7 +35,13 @@ class CardPlayEvent:
 
 @dataclass
 class ElixirState:
-    """Current elixir state for a player."""
+    """Current elixir state for a player.
+
+    Attributes:
+        current (float): Current elixir amount.
+        last_update_ms (int): Timestamp of last update in milliseconds.
+        cards_played (List[CardPlayEvent]): History of cards played.
+    """
     current: float
     last_update_ms: int
     cards_played: List[CardPlayEvent] = field(default_factory=list)
@@ -49,12 +62,12 @@ class OpponentElixirTracker:
     - Each card costs a known amount of elixir
 
     Attributes:
-        current_elixir (float): how much elixir you currently have
-        last_update_ms (int): last updated time
-        game_phase (GamePhase): the game phase
-        card_history (List): Played cards
-        _previous_on_field_cards (Set): cards that are currently on the field
-        _tracked_card_instances (Set): unique card IDs
+        current_elixir (float): Current estimated opponent elixir (0.0 - 10.0).
+        last_update_ms (int): Timestamp of last update in milliseconds.
+        game_phase (GamePhase): Current game phase.
+        card_history (List[CardPlayEvent]): History of detected card plays.
+        _previous_on_field_cards (Set[str]): Cards detected on field in previous frame.
+        _tracked_card_instances (Set[str]): Unique card IDs already counted.
     """
 
     def __init__(self):

@@ -37,6 +37,9 @@ class OutcomeDetector:
 
     Scans the last N frames of a video for the outcome text that appears
     at the center of the screen after the match ends.
+
+    Attributes:
+        _reader (EasyOCR Reader or None): OCR reader instance, lazily initialized.
     """
 
     def __init__(self):
