@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolov8n.pt
-data: /Users/albertlungu/Local/GitHub/TorchRoyale/data/datasets/visionbot_enemy/data.yaml
+data: /Users/ksukshavasi/TorchRoyale/data/datasets/visionbot_enemy/data.yaml
 epochs: 100
 time: null
 patience: 100
@@ -12,8 +12,8 @@ save_period: -1
 cache: false
 device: mps
 workers: 8
-project: /Users/albertlungu/Local/GitHub/TorchRoyale/data/models/onfield
-name: visionbot
+project: /Users/ksukshavasi/TorchRoyale/data/models/onfield
+name: visionbot-2
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -107,4 +107,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: /Users/albertlungu/Local/GitHub/TorchRoyale/data/models/onfield/visionbot
+save_dir: /Users/ksukshavasi/TorchRoyale/data/models/onfield/visionbot-2
