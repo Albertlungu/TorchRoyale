@@ -4,14 +4,42 @@ A complete machine learning pipeline for training a Decision Transformer model t
 
 ## Architecture Overview
 
-```
-Replay Videos → Frame Analysis → Episode Generation → Model Training
-    ↓              ↓                   ↓                   ↓
- .mp4 files   JSON state per    Trajectory           Decision
-              frame           collections        Transformer
+```mermaid
+graph LR
+    A[Replay Videos] --> B[Frame Analysis]
+    B --> C[Episode Generation]
+    C --> D[Model Training]
+    
+    A -->|.mp4 files| B
+    B -->|JSON state per frame| C
+    C -->|Trajectory collections| D
+    D -->|Decision Transformer| E[Trained Model]
 ```
 
 ### Three-Layer Pipeline
+
+```mermaid
+graph TD
+    subgraph Detection Layer
+        DL1[DualModelDetector] -->|on-field units| Output[FrameDetections]
+        DL2[HandClassifier] -->|hand cards| Output
+        DL3[HandTracker] -->|tracked hand| Output
+    end
+    
+    subgraph Analysis Layer
+        AL1[VideoAnalyzer] -->|orchestrates| DL1
+        AL1 --> AL2[OCR Detector]
+        AL1 -->|JSON output| Result[Per-frame State]
+    end
+    
+    subgraph Training Layer
+        TL1[Feature Encoder] -->|33-dim vectors| TL2[Decision Transformer]
+        TL2 -->|trained model| TL3[Checkpoints]
+    end
+    
+    Output --> AL1
+    Result -->|JSON files| TL1
+```
 
 1. **Detection Layer** (`src/detection/`)
    - KataCR: Dual YOLOv8 models for on-field unit detection
@@ -34,15 +62,18 @@ Replay Videos → Frame Analysis → Episode Generation → Model Training
 
 ### Detection Pipeline
 
-#### KataCRDetector (`src/detection/katacr.py`)
+#### DualModelDetector (`src/detection/dual_model_detector.py`)
 
-Wraps two YOLOv8 models from KataCR v0.7.13 for unit detection.
+Replaces KataCRDetector with a dedicated dual-model architecture:
+- **Cicadas model**: Detects PLAYER'S cards (Hog 2.6 deck: cannon, fireball, hog_rider, ice_golem, ice_spirit, log, musketeer, skeletons, evo_ice_spirit, evo_skeletons)
+- **Vision Bot model**: Detects OPPONENT'S cards (all cards in the game)
 
 **Key features:**
-- Dual-model combo with NMS merging for robust detections
-- Automatic model weight download from Google Drive on first use
+- Model assignment determines ownership directly (is_opponent flag)
+- No motion-based ownership correction needed
+- Cross-model NMS for overlapping detections between the two models
 - Coordinate transformation from part2 crop (576×896) to full frame
-- Motion-based opponent/player classification using tile_y movement
+- Same crop logic as KataCR for pixel-perfect compatibility
 
 **Model outputs per detection:**
 ```
@@ -51,24 +82,17 @@ Wraps two YOLOv8 models from KataCR v0.7.13 for unit detection.
 
 Coordinates are in the 576×896 arena crop (part2), automatically transformed to full-frame and then to tile coordinates.
 
-**Noise filtering:**
-Removes KataCR internal classes that aren't real game units:
-- `padding_belong`: Arena ownership marker (no actual unit)
-- `bar`, `bar-level`: Health/elixir bars
-- `clock`, `elixir`: UI elements
-- `emote`: Cosmetics
-- `evolution-symbol`: Evo UI indicator
-- `tower`: Defensive structures (handled separately)
+**Ownership logic:**
 
-**Motion-based ownership correction:**
+Ownership is determined by which model detected the unit:
+- Cicadas detections → `is_opponent = False` (player's cards)
+- Vision Bot detections → `is_opponent = True` (opponent's cards)
 
-Units are initially classified as opponent/player based on spawn position (`tile_y < PLAYER_SIDE_MIN_ROW`). However, units can cross the river or be placed in the opponent's half after a tower break. The motion tracker compares unit positions across snapshots (every 2 frames) and corrects ownership based on vertical movement:
+This is more reliable than tile-based heuristics since units can cross the river during gameplay.
 
-- `tile_y increased` → moving toward player side (bottom) → opponent unit
-- `tile_y decreased` → moving toward opponent side (top) → player unit
-- `tile_y unchanged` → static unit keeps spawn-based label
+**Cross-model NMS:**
 
-This logic only applies to units in the active play zone (rows 2–29), allowing king tower rows to use spawn-based labels.
+When both models detect a unit at overlapping pixel coordinates (IoU > threshold), the detection with higher confidence is kept. This handles edge cases where both models fire on the same unit.
 
 **Calibration:**
 
@@ -134,7 +158,7 @@ The `last_played_evo` field exposes which cards were just played as evo, used by
 
 Orchestrates frame-by-frame video processing:
 
-1. **Detection**: Runs KataCR on frame
+1. **Detection**: Runs DualModelDetector on frame
 2. **Hand classification**: Runs HandClassifier on frame
 3. **OCR**: Detects game timer, elixir count, multiplier icon
 4. **Hand tracking**: Updates HandTracker with detections
@@ -293,6 +317,31 @@ Orchestrates data loading, optimization, and checkpointing:
 
 ## Data Flow
 
+```mermaid
+graph LR
+    subgraph Step 1: Video Analysis
+        V1[Replay Video] --> VA[VideoAnalyzer]
+        VA -->|DualModelDetector| OF[On-field Detections]
+        VA -->|HandClassifier| HC[Hand Cards]
+        VA -->|OCR| T[Timer/Elixir]
+        OF --> JSON[analysis.json]
+        HC --> JSON
+        T --> JSON
+    end
+    
+    subgraph Step 2: Episode Generation
+        JSON --> EG[Episode Builder]
+        EG -->|detect plays| EP[Episodes]
+        EP --> PKL[episodes.pkl]
+    end
+    
+    subgraph Step 3: Model Training
+        PKL --> FE[Feature Encoder]
+        FE -->|33-dim vectors| DT[Decision Transformer]
+        DT -->|600 epochs| M[best.pt]
+    end
+```
+
 ### 1. Video Analysis
 
 ```bash
@@ -332,16 +381,39 @@ Trains for 600 epochs, saving checkpoints every 25 epochs. Monitors validation a
 
 ## Directory Structure
 
+```mermaid
+graph TD
+    A[Replay Videos] -->|mp4 files| B[VideoAnalyzer]
+    B --> C[DualModelDetector]
+    B --> D[HandClassifier]
+    B --> E[HandTracker]
+    B --> F[OCR Detector]
+    C -->|on-field detections| G[FrameDetections JSON]
+    D -->|hand cards| G
+    E -->|tracked hand| G
+    F -->|timer, elixir| G
+    G --> H[Episode Builder]
+    H --> I[Training Episodes]
+    I --> J[Decision Transformer]
+    J --> K[Trained Model]
+```
+
+### Directory Structure
+
 ```
 TorchRoyale/
 ├── data/
 │   ├── models/
-│   │   ├── onfield/           # KataCR detection models
-│   │   │   ├── detector1_v0.7.13.pt
-│   │   │   └── detector2_v0.7.13.pt
+│   │   ├── onfield/              # Dual-model detection weights
+│   │   │   ├── cicadas_best.pt       # Player cards (Hog 2.6 deck)
+│   │   │   ├── visionbot_best.pt     # Opponent cards (all cards)
+│   │   │   └── README.md            # Model documentation
 │   │   └── hand_classifier/
 │   │       └── hand_classifier.pt
-│   └── replays/               # Input video files (.mp4)
+│   ├── datasets/                # Roboflow datasets (auto-downloaded)
+│   │   ├── cicadas/
+│   │   └── visionbot_enemy/
+│   └── replays/                # Input video files (.mp4)
 │
 ├── output/
 │   ├── analysis/              # Per-video JSON analysis
@@ -360,7 +432,8 @@ TorchRoyale/
 │   │   └── game.py            # Grid dims (17x31), player side row
 │   │
 │   ├── detection/
-│   │   ├── katacr.py          # On-field unit detection
+│   │   ├── dual_model_detector.py # Dual YOLOv8 on-field detection
+│   │   ├── katacr_legacy.py  # Old KataCR detector (archived)
 │   │   ├── hand_classifier.py # Hand card classification
 │   │   ├── hand_tracker.py    # Stateful hand state + evo tracking
 │   │   └── result.py          # Detection and FrameDetections dataclasses
@@ -381,7 +454,7 @@ TorchRoyale/
 │   │
 │   ├── transformer/
 │   │   ├── model.py           # Decision Transformer architecture
-│   │   └── train.py           # Training loop
+│   │   └── train.py          # Training loop
 │   │
 │   ├── grid/
 │   │   └── coordinate_mapper.py # Pixel ↔ tile conversions
@@ -391,8 +464,10 @@ TorchRoyale/
 ├── scripts/
 │   ├── analyze_video.py       # Video analysis script
 │   ├── convert_to_episodes.py # Episode generation script
-│   ├── test_katacr.py         # Debug: test KataCR on frame
-│   └── test_hand_classifier.py # Debug: test hand classifier on frame
+│   ├── download_datasets.py   # Download Roboflow datasets
+│   ├── train_cicadas.py       # Train Cicadas model
+│   ├── train_visionbot.py     # Train Vision Bot model
+│   └── test_dual_detector.py  # Smoke test for dual detector
 │
 └── README.md
 ```
@@ -401,13 +476,21 @@ TorchRoyale/
 
 ## Known Limitations
 
-### Hog Rider Misclassification
+### Model Coverage
 
-KataCR models consistently misidentify hog riders as ice-spirit at ~0.94 confidence. This is a training limitation of the KataCR models — they were not trained on hog-rider as a distinct class.
+The Cicadas model only detects Hog 2.6 deck cards (cannon, fireball, hog_rider, ice_golem, ice_spirit, log, musketeer, skeletons, evo_ice_spirit, evo_skeletons). If you play a different deck, the player card detection will not work.
 
-**Impact:** Training episodes with hog riders will have incorrect unit labels.
+**Impact:** Training episodes will miss player cards not in the Hog 2.6 deck.
 
-**Workaround:** Manual annotation of affected frames or retraining KataCR models on custom Clash Royale dataset.
+**Workaround:** Retrain the Cicadas model on your specific deck cards using Roboflow.
+
+### Vision Bot False Positives
+
+The Vision Bot model is trained to detect ALL cards in the game. This broad coverage may lead to false positives, especially for cards that look similar.
+
+**Impact:** Opponent card detections may include incorrect classifications.
+
+**Workaround:** Increase the confidence threshold in DualModelDetector (default: 0.45).
 
 ### Missing Tower State
 

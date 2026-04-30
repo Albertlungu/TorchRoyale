@@ -4,3 +4,5 @@ ultralytics
 opencv-python
 easyocr
 numpy
+roboflow
+python-dotenv
