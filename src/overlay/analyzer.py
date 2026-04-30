@@ -66,8 +66,12 @@ class VideoAnalyzer:
         if self._roboflow is not None:
             return
         try:
+            import os  # pylint: disable=import-outside-toplevel
+            from dotenv import load_dotenv  # type: ignore  # pylint: disable=import-outside-toplevel
             from inference import get_model  # type: ignore  # pylint: disable=import-outside-toplevel
-            self._roboflow = get_model("torchroyale/4")
+            load_dotenv()
+            api_key = os.getenv("ROBOFLOW_API_KEY")
+            self._roboflow = get_model("torchroyale/4", api_key=api_key)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             if self.verbose:
                 print(f"[Roboflow] Not available: {exc} — hand detection via HandTracker only")
@@ -177,7 +181,9 @@ class VideoAnalyzer:
                     pass
 
             all_dets: List[DetectionDict] = on_field_dets + hand_dets
-            tracked_hand: List[str] = self._hand_tracker.update(all_dets)
+            x_left, x_right = self._katacr._game_strip[:2] if self._katacr._game_strip else (None, None)  # type: ignore[index]
+            game_strip = (x_left, x_right) if x_left is not None else None
+            tracked_hand: List[str] = self._hand_tracker.update(all_dets, frame=frame, game_strip=game_strip)
 
             frames.append(FrameDict(
                 timestamp_ms=ts_ms,

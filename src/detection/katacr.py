@@ -20,6 +20,7 @@ Screen partitioning for portrait-in-landscape (ratio ~2.16):
 Public API:
   KataCRDetector -- load weights once, calibrate from a frame, detect per frame
 """
+
 from __future__ import annotations
 
 import re
@@ -44,7 +45,7 @@ for _candidate in _KATACR_SRC_CANDIDATES:
 from src.detection.result import Detection, FrameDetections
 from src.grid.coordinate_mapper import CoordinateMapper
 
-_WEIGHTS_DIR = Path(__file__).parents[2] / "data/models/katacr"
+_WEIGHTS_DIR = Path(__file__).parents[2] / "data/models/onfield"
 
 # part2 crop params per aspect-ratio bucket (x, y, w, h as fractions of game strip)
 _PART2_PARAMS: Dict[Tuple[float, float], Tuple[float, float, float, float]] = {
@@ -89,6 +90,7 @@ class KataCRDetector:
 
         if device == "auto":
             import torch  # pylint: disable=import-outside-toplevel
+
             if torch.backends.mps.is_available():
                 self._device = "mps"
             elif torch.cuda.is_available():
@@ -110,7 +112,10 @@ class KataCRDetector:
                     f"KataCR weight not found: {weight}\n"
                     f"Place detector1_v0.7.13.pt and detector2_v0.7.13.pt in {_WEIGHTS_DIR}"
                 )
-        from ultralytics import YOLO  # type: ignore  # pylint: disable=import-outside-toplevel
+        from ultralytics import (
+            YOLO,  # type: ignore  # pylint: disable=import-outside-toplevel
+        )
+
         self._models = [
             YOLO(str(weight1)).to(self._device),
             YOLO(str(weight2)).to(self._device),
@@ -189,6 +194,7 @@ class KataCRDetector:
             Tuple of (resized crop, crop x-offset in frame, crop y-offset in frame).
         """
         import cv2  # pylint: disable=import-outside-toplevel
+
         x_left, x_right, y_top, y_bot = self._game_strip  # type: ignore[misc]
         game_w = x_right - x_left
         game_h = y_bot - y_top
@@ -230,7 +236,9 @@ class KataCRDetector:
             return np.zeros((0, 6))
 
         all_preds = torch.cat(preds, dim=0)
-        keep = torchvision.ops.nms(all_preds[:, :4], all_preds[:, 4], self.IOU_THRESHOLD)
+        keep = torchvision.ops.nms(
+            all_preds[:, :4], all_preds[:, 4], self.IOU_THRESHOLD
+        )
         return all_preds[keep].cpu().numpy()
 
     def _parse(
@@ -262,12 +270,18 @@ class KataCRDetector:
         scale_x = (x_right - x_left) * crop_w / part2_w
         scale_y = (y_bot - y_top) * crop_h / part2_h
 
-        from src.constants.game import PLAYER_SIDE_MIN_ROW  # pylint: disable=import-outside-toplevel
+        from src.constants.game import (
+            PLAYER_SIDE_MIN_ROW,  # pylint: disable=import-outside-toplevel
+        )
 
         for row in raw:
             bx1, by1, bx2, by2, conf, cls_idx = (
-                float(row[0]), float(row[1]), float(row[2]),
-                float(row[3]), float(row[4]), int(row[5]),
+                float(row[0]),
+                float(row[1]),
+                float(row[2]),
+                float(row[3]),
+                float(row[4]),
+                int(row[5]),
             )
             # Convert part2 pixels → full frame pixels
             fx1 = crop_x + bx1 * scale_x
@@ -290,14 +304,16 @@ class KataCRDetector:
             raw_name = names.get(cls_idx, f"unit_{cls_idx}")
             card_name = _base(raw_name)
 
-            detections.append(Detection(
-                class_name=card_name,
-                tile_x=tile_col,
-                tile_y=tile_row,
-                is_opponent=is_opponent,
-                is_on_field=True,
-                confidence=round(conf, 3),
-                bbox_px=(int(fx1), int(fy1), int(fx2), int(fy2)),
-            ))
+            detections.append(
+                Detection(
+                    class_name=card_name,
+                    tile_x=tile_col,
+                    tile_y=tile_row,
+                    is_opponent=is_opponent,
+                    is_on_field=True,
+                    confidence=round(conf, 3),
+                    bbox_px=(int(fx1), int(fy1), int(fx2), int(fy2)),
+                )
+            )
 
         return detections
