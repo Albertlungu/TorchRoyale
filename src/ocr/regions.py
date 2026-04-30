@@ -58,6 +58,13 @@ class UIRegions:
         self.timer: Region = Region(0, 0, 0, 0)
         self.elixir_number: Region = Region(0, 0, 0, 0)
         self.multiplier_icon: Region = Region(0, 0, 0, 0)
+        # Tower HP regions (3 per side: left, king, right)
+        self.player_tower_left: Region = Region(0, 0, 0, 0)
+        self.player_tower_king: Region = Region(0, 0, 0, 0)
+        self.player_tower_right: Region = Region(0, 0, 0, 0)
+        self.opponent_tower_left: Region = Region(0, 0, 0, 0)
+        self.opponent_tower_king: Region = Region(0, 0, 0, 0)
+        self.opponent_tower_right: Region = Region(0, 0, 0, 0)
         self._build()
 
     def _build(self) -> None:
@@ -92,6 +99,52 @@ class UIRegions:
             y_min=int(frame_h * 0.125),
             x_max=int(frame_w * 0.96),
             y_max=int(frame_h * 0.155),
+        )
+
+        # Tower HP regions - Player side (bottom)
+        # Left tower: ~2% from left, ~96% down
+        self.player_tower_left = Region(
+            x_min=int(frame_w * 0.02),
+            y_min=int(frame_h * 0.96),
+            x_max=int(frame_w * 0.06),
+            y_max=int(frame_h * 0.98),
+        )
+        # King tower: ~48% from left, ~96% down
+        self.player_tower_king = Region(
+            x_min=int(frame_w * 0.48),
+            y_min=int(frame_h * 0.96),
+            x_max=int(frame_w * 0.52),
+            y_max=int(frame_h * 0.98),
+        )
+        # Right tower: ~94% from left, ~96% down
+        self.player_tower_right = Region(
+            x_min=int(frame_w * 0.94),
+            y_min=int(frame_h * 0.96),
+            x_max=int(frame_w * 0.98),
+            y_max=int(frame_h * 0.98),
+        )
+
+        # Tower HP regions - Opponent side (top)
+        # Left tower: ~2% from left, ~2% down
+        self.opponent_tower_left = Region(
+            x_min=int(frame_w * 0.02),
+            y_min=int(frame_h * 0.02),
+            x_max=int(frame_w * 0.06),
+            y_max=int(frame_h * 0.04),
+        )
+        # King tower: ~48% from left, ~2% down
+        self.opponent_tower_king = Region(
+            x_min=int(frame_w * 0.48),
+            y_min=int(frame_h * 0.02),
+            x_max=int(frame_w * 0.52),
+            y_max=int(frame_h * 0.04),
+        )
+        # Right tower: ~94% from left, ~2% down
+        self.opponent_tower_right = Region(
+            x_min=int(frame_w * 0.94),
+            y_min=int(frame_h * 0.02),
+            x_max=int(frame_w * 0.98),
+            y_max=int(frame_h * 0.04),
         )
 
     # ------------------------------------------------------------------

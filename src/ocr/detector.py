@@ -230,3 +230,78 @@ class DigitDetector:
                 if ch in "23":
                     return int(ch)
         return 2
+
+    # ------------------------------------------------------------------
+    # Tower HP
+    # ------------------------------------------------------------------
+
+    def detect_tower_hp(
+        self, frame: np.ndarray, region: Tuple[int, int, int, int]
+    ) -> OCRResult:
+        """
+        Read tower HP percentage from a frame region.
+
+        Towers show HP as a number (e.g., "1234" for 1234 HP).
+        We read the digits and return a percentage (0-100).
+
+        Args:
+            frame:  full BGR frame.
+            region: (x1, y1, x2, y2) crop rectangle.
+
+        Returns:
+            OCRResult with HP percentage (0-100) or 100 if unreadable.
+        """
+        x1, y1, x2, y2 = region
+        roi = frame[y1:y2, x1:x2]
+        if roi.size == 0:
+            return OCRResult(100, 0.0, False)
+
+        processed = self._preprocess(roi)
+        try:
+            results: List = self._get_reader().readtext(
+                processed, allowlist="0123456789", paragraph=False, min_size=5
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            return OCRResult(100, 0.0, False)
+
+        if not results:
+            return OCRResult(100, 0.0, False)
+
+        # Get the text with highest confidence
+        best = max(results, key=lambda item: item[2])
+        text = best[1].strip()
+
+        # Parse HP value
+        hp_value = self._parse_hp(text)
+        if hp_value is not None:
+            return OCRResult(hp_value, best[2], True, text)
+        return OCRResult(100, 0.0, False, text)
+
+    @staticmethod
+    def _parse_hp(text: str) -> Optional[int]:
+        """
+        Parse a tower HP string into a percentage (0-100).
+
+        Args:
+            text: raw OCR text (e.g., "1234", "100").
+
+        Returns:
+            HP percentage (0-100), or None if unparseable.
+        """
+        if not text:
+            return None
+
+        # Extract digits only
+        digits = "".join(c for c in text if c.isdigit())
+        if not digits:
+            return None
+
+        # Tower HP is typically 3-4 digits, convert to percentage
+        value = int(digits)
+
+        # If value > 100, it's likely raw HP (e.g., 1234)
+        # Convert to percentage (assuming max HP ~3000)
+        if value > 100:
+            value = min(100, int((value / 3000) * 100))
+
+        return max(0, min(100, value))
