@@ -8,6 +8,7 @@ portrait game strip centred horizontally (~497px wide).
 Public API:
   HandClassifier -- load weights once, call classify(frame) each frame
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +16,9 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-_WEIGHTS_PATH = Path(__file__).parents[2] / "data/models/hand_classifier/hand_classifier.pt"
+_WEIGHTS_PATH = (
+    Path(__file__).parents[2] / "data/models/hand_classifier/hand_classifier.pt"
+)
 
 # Cards whose dataset folder names differ from the pipeline's canonical names.
 _NAME_ALIASES = {
@@ -40,22 +43,51 @@ def _normalise(name: str) -> str:
     n = _NAME_ALIASES.get(n, n)
     return n.replace(" ", "-")
 
+
 # Vertical crop of the hand area as fractions of frame height
-_Y_TOP_FRAC: float = 0.845
-_Y_BOT_FRAC: float = 0.965
+_Y_TOP_FRAC: float = 0.824
+_Y_BOT_FRAC: float = 0.945
 
 # The "Next card" preview occupies this fraction of the game strip before slot 0
 _NEXT_CARD_FRAC: float = 0.115
+
+# Next-card bounding box edges (fractions). These allow explicit control of the
+# left/right/top/bottom edges of the preview box instead of a single width frac.
+# Defaults chosen to match legacy behavior.
+_NEXT_LEFT_FRAC: float = 0.048
+_NEXT_RIGHT_FRAC: float = 0.145
+_NEXT_TOP_FRAC: float = 0.92
+_NEXT_BOTTOM_FRAC: float = 0.975
 
 # Horizontal inset applied symmetrically to each slot, as a fraction of slot_w
 _INSET_FRAC: float = 0.091
 
 # Per-slot horizontal offsets as fractions of slot_w (positive = right).
 # Calibrated visually on 1920x1080; expressed as fractions so they scale to any res.
-_SLOT_OFFSET_FRACS: Tuple[float, float, float, float] = (0.409, 0.273, 0.136, 0.0)
+_SLOT_OFFSET_FRACS: Tuple[float, float, float, float] = (0.409, 0.273, 0.136, -0.095)
 
 # Minimum confidence to return a label; below this returns None
 _MIN_CONF: float = 0.40
+
+
+def get_next_bbox(frame_h: int, frame_w: int, x_left: int, x_right: int):
+    """Return pixel bbox (x1, y1, x2, y2) for the Next-card preview area.
+
+    Args:
+        frame_h, frame_w: frame dimensions
+        x_left, x_right: detected game strip left/right columns
+    """
+    game_w = x_right - x_left
+    next_left = x_left + int(game_w * _NEXT_LEFT_FRAC)
+    next_right = x_left + int(game_w * _NEXT_RIGHT_FRAC)
+    next_top = int(frame_h * _NEXT_TOP_FRAC)
+    next_bottom = int(frame_h * _NEXT_BOTTOM_FRAC)
+    return (
+        max(0, next_left),
+        max(0, next_top),
+        min(frame_w, next_right),
+        min(frame_h, next_bottom),
+    )
 
 
 class HandClassifier:
@@ -82,9 +114,12 @@ class HandClassifier:
                 "Run: python scripts/train_hand_classifier.py"
             )
         from ultralytics import YOLO  # pylint: disable=import-outside-toplevel
+
         self._model = YOLO(str(self._weights))
 
-    def classify(self, frame: np.ndarray, game_strip: Optional[Tuple[int, int]] = None) -> List[Optional[str]]:
+    def classify(
+        self, frame: np.ndarray, game_strip: Optional[Tuple[int, int]] = None
+    ) -> List[Optional[str]]:
         """
         Classify all four hand card slots in the frame.
 
@@ -111,7 +146,10 @@ class HandClassifier:
         game_w = x_right - x_left
         y_top = int(frame_h * _Y_TOP_FRAC)
         y_bot = int(frame_h * _Y_BOT_FRAC)
-        next_end = x_left + int(game_w * _NEXT_CARD_FRAC)
+        # Next-card bounding box edges (pixel coords)
+        next_left = x_left + int(game_w * _NEXT_LEFT_FRAC)
+        next_right = x_left + int(game_w * _NEXT_RIGHT_FRAC)
+        next_end = next_right
         cards_w = x_right - next_end
         slot_w = cards_w // 4
 
