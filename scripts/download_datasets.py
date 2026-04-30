@@ -144,15 +144,41 @@ def download_dataset(
         return
 
     print(f"  Downloading to {destination}...")
-    destination.mkdir(parents=True, exist_ok=True)
+    zip_path = destination / "roboflow.zip"
 
     try:
         rf_workspace = rf.workspace(workspace)
         rf_project = rf_workspace.project(project)
         rf_version = rf_project.version(version)
 
-        # Download and extract
+        # Download - Roboflow SDK extracts directly to destination
         dataset = rf_version.download(format, location=str(destination))
+
+        # Verify download actually created files
+        files_found = list(destination.glob("*"))
+        if not files_found:
+            raise RuntimeError(
+                f"Download completed but no files found in {destination}. "
+                "Check Roboflow credentials and project/version."
+            )
+
+        # Extract if zip file exists
+        import shutil
+        if zip_path.exists():
+            print(f"  Extracting {zip_path}...")
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(str(destination))
+            zip_path.unlink()  # Remove the zip file
+
+        # Move files from any subdirectories to destination
+        for item in list(destination.iterdir()):
+            if item.is_dir() and item.name != "__MACOSX":
+                # Move contents of subdirectory to destination
+                for subitem in item.iterdir():
+                    shutil.move(str(subitem), str(destination / subitem.name))
+                item.rmdir()
+
         print(f"  Downloaded successfully to {destination}")
 
     except Exception as e:
