@@ -474,6 +474,25 @@ TorchRoyale/
 
 ---
 
+## Game Outcome Labels
+
+Game outcomes are currently hardcoded in `src/data/game_outcomes.py`.
+This is used for training the Decision Transformer (win/loss as reward signal).
+
+| Game | Outcome | Game | Outcome | Game | Outcome |
+|------|---------|------|---------|------|---------|
+| 1-3  | W       | 9-15 | W       | 21-23 | W       |
+| 4    | L       | 16-20| W       |      |         |
+| 5-6  | W       |      |         |      |         |
+| 7    | L       |      |         |      |         |
+
+**Note:** Automatic game outcome detection is NOT implemented. Each game is manually labeled.
+To update outcomes, edit the `GAME_OUTCOMES` dict in `src/data/game_outcomes.py`.
+
+To update outcomes, edit the `GAME_OUTCOMES` dict in `src/data/game_outcomes.py`.
+
+---
+
 ## Known Limitations
 
 ### Model Coverage
