@@ -89,11 +89,6 @@ def main() -> None:
     print("Vision Bot YOLOv8 Resume Training")
     print("=" * 60)
 
-    if not data_yaml.exists():
-        print(f"Error: Dataset YAML not found at {data_yaml}")
-        print("Please run: python scripts/download_datasets.py")
-        sys.exit(1)
-
     if not checkpoint.exists():
         print(f"Error: Checkpoint not found at {checkpoint}")
         sys.exit(1)
@@ -112,16 +107,15 @@ def main() -> None:
     print(f"Dataset: {data_yaml}")
 
     model = YOLO(str(checkpoint))
+    # resume=True tells Ultralytics to read all training args from the
+    # checkpoint's saved args.yaml. Passing data/epochs/name alongside
+    # resume=True causes a class-count mismatch in the TAL assigner because
+    # the model head stays frozen to the checkpoint's nc while the data
+    # loader uses the new dataset's nc.
     results = model.train(
-        data=str(data_yaml),
-        epochs=args.epochs,
-        imgsz=args.imgsz,
-        batch=args.batch,
-        device=device,
-        project=str(project_dir),
-        name=args.name,
         resume=True,
-        exist_ok=args.exist_ok,
+        device=device,
+        batch=args.batch,
         verbose=True,
     )
 
