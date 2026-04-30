@@ -127,18 +127,30 @@ class VideoAnalyzer:
 
             ts_ms: int = int(cap.get(cv2.CAP_PROP_POS_MSEC))
 
-            # Rebuild per-frame UI regions for alignment drift
-            frame_ui = UIRegions(vid_w, vid_h)
-            frame_ui.align_timer(frame)
-            frame_ui.align_elixir(frame)
-            frame_ui.align_multiplier(frame)
+        # Rebuild per-frame UI regions for alignment drift
+        frame_ui = UIRegions(vid_w, vid_h)
+        frame_ui.align_timer(frame)
+        frame_ui.align_elixir(frame)
+        frame_ui.align_multiplier(frame)
 
-            timer_secs = self._ocr.detect_timer(frame, frame_ui.timer.to_tuple())
-            elixir_result = self._ocr.detect_elixir(frame, frame_ui.elixir_number.to_tuple())
-            mult = self._ocr.detect_multiplier(frame, frame_ui.multiplier_icon.to_tuple())
-            player_elixir: Optional[int] = (
-                elixir_result.value if elixir_result.detected else None
-            )
+        timer_secs = self._ocr.detect_timer(frame, frame_ui.timer.to_tuple())
+        elixir_result = self._ocr.detect_elixir(frame, frame_ui.elixir_number.to_tuple())
+        mult = self._ocr.detect_multiplier(frame, frame_ui.multiplier_icon.to_tuple())
+        player_elixir: Optional[int] = (
+            elixir_result.value if elixir_result.detected else None
+        )
+
+        # Tower HP detection (6 towers total: 3 player, 3 opponent)
+        player_towers = {
+            "player_left": self._read_tower_hp(frame, frame_ui.player_tower_left),
+            "player_king": self._read_tower_hp(frame, frame_ui.player_tower_king),
+            "player_right": self._read_tower_hp(frame, frame_ui.player_tower_right),
+        }
+        opponent_towers = {
+            "opponent_left": self._read_tower_hp(frame, frame_ui.opponent_tower_left),
+            "opponent_king": self._read_tower_hp(frame, frame_ui.opponent_tower_king),
+            "opponent_right": self._read_tower_hp(frame, frame_ui.opponent_tower_right),
+        }
 
             # Dual-model battlefield detection
             field_result = self._dual_detector.detect(frame)
@@ -179,6 +191,23 @@ class VideoAnalyzer:
 
             all_dets: List[DetectionDict] = on_field_dets + hand_dets
             tracked_hand: List[str] = self._hand_tracker.update(all_dets, frame=frame, game_strip=game_strip)
+
+            # Convert tower HP readings to TowerDict format
+            def _make_tower_dict(tower_readings: dict) -> dict:
+                """Convert HP readings to TowerDict format."""
+                from src.types import TowerDict
+
+                result = {}
+                for key, reading in tower_readings.items():
+                    if reading.detected:
+                        hp_pct = reading.value  # Already 0-100
+                    else:
+                        hp_pct = 100  # Default to full HP if not detected
+                    result[key] = TowerDict(health_percent=hp_pct, is_destroyed=(hp_pct == 0))
+                return result
+
+            player_towers_dict = _make_tower_dict(player_towers)
+            opponent_towers_dict = _make_tower_dict(opponent_towers)
 
             # Hero musketeer: KataCR cannot distinguish it from regular musketeer.
             # If it is in the hand, every on-field musketeer this match is hero musketeer.
