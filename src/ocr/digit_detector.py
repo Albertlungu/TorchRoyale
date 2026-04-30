@@ -50,20 +50,28 @@ class DigitDetector:
         reader (EasyOCR Reader or None): OCR reader instance, lazily loaded.
     """
 
-    def __init__(self, preload_ocr: bool = False):
+    def __init__(self, preload_ocr: bool = False) -> None:
         """
         Initialize digit detector.
 
         Args:
-            preload_ocr: If True, load OCR model immediately.
-                        If False (default), load on first use.
+            preload_ocr (bool): If True, load OCR model immediately.
+                           If False (default), load on first use.
+
+        Returns:
+            None
         """
         self.reader = None
         if preload_ocr:
             self._initialize_reader()
     
-    def _initialize_reader(self):
-        """Private helper to initialize the EasyOCR reader instance."""
+    def _initialize_reader(self) -> None:
+        """
+        Private helper to initialize the EasyOCR reader instance.
+
+        Returns:
+            None
+        """
         import easyocr
         self._reader = easyocr.Reader(
             ['en'],
@@ -73,15 +81,26 @@ class DigitDetector:
         )
 
     @property
-    def reader(self):
-        """Lazy-load getter for the OCR reader."""
+    def reader(self) -> "easyocr.Reader":
+        """
+        Lazy-load getter for the OCR reader.
+
+        Returns:
+            (easyocr.Reader) The EasyOCR reader instance.
+        """
         if self._reader is None:
             self._initialize_reader()
         return self._reader
     @reader.setter
-    def reader(self, value):
+    def reader(self, value: "easyocr.Reader") -> None:
         """
-        The setter for reader variable weak private. 
+        Set the OCR reader instance.
+
+        Args:
+            value (easyocr.Reader): The EasyOCR reader instance.
+
+        Returns:
+            None
         """
         self._reader = value
 
@@ -158,10 +177,10 @@ class DigitDetector:
         - "110" -> 10 (OCR doubled the "1")
 
         Args:
-            text: Raw OCR text
+            text (str): Raw OCR text.
 
         Returns:
-            Elixir value (0-10) or None if parsing failed
+            (Optional[int]) Elixir value (0-10) or None if parsing failed.
         """
         if not text or not text.strip():
             return None
@@ -334,11 +353,11 @@ class DigitDetector:
         Detect card elixir cost from a card region.
 
         Args:
-            image: Full frame (BGR format)
-            region: (x_min, y_min, x_max, y_max) of card cost area
+            image (np.ndarray): Full frame (BGR format).
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) of card cost area.
 
         Returns:
-            DetectionResult with detected cost
+            (DetectionResult) Detection result with detected cost.
         """
         # Card costs are single digits 1-10, same as elixir detection
         return self.detect_elixir(image, region)
@@ -421,4 +440,10 @@ class DigitDetector:
         return binary
 
     def __repr__(self) -> str:
+        """
+        String representation of the DigitDetector.
+
+        Returns:
+            (str) String showing OCR load status.
+        """
         return f"DigitDetector(ocr_loaded={self._reader is not None})"

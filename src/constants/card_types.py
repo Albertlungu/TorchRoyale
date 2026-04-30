@@ -297,22 +297,54 @@ def get_cards_by_type(card_type: CardType) -> list[str]:
 
 
 def is_troop(card_name: str) -> bool:
-    """Check if card is a troop."""
+    """
+    Check if card is a troop.
+
+    Args:
+        card_name (str): Name of the card.
+
+    Returns:
+        (bool) True if the card is a troop, False otherwise.
+    """
     return get_card_type(card_name) == CardType.TROOP
 
 
 def is_spell(card_name: str) -> bool:
-    """Check if card is a spell."""
+    """
+    Check if card is a spell.
+
+    Args:
+        card_name (str): Name of the card.
+
+    Returns:
+        (bool) True if the card is a spell, False otherwise.
+    """
     return get_card_type(card_name) == CardType.SPELL
 
 
 def is_building(card_name: str) -> bool:
-    """Check if card is a building."""
+    """
+    Check if card is a building.
+
+    Args:
+        card_name (str): Name of the card.
+
+    Returns:
+        (bool) True if the card is a building, False otherwise.
+    """
     return get_card_type(card_name) == CardType.BUILDING
 
 
 def is_tower_troop(card_name: str) -> bool:
-    """Check if card is a tower troop."""
+    """
+    Check if card is a tower troop.
+
+    Args:
+        card_name (str): Name of the card.
+
+    Returns:
+        (bool) True if the card is a tower troop, False otherwise.
+    """
     return get_card_type(card_name) == CardType.TOWER_TROOP
 
 
@@ -326,5 +358,13 @@ CARD_TYPE_NAMES: Dict[CardType, str] = {
 
 
 def get_card_type_name(card_name: str) -> str:
-    """Get display name for card type."""
+    """
+    Get display name for card type.
+
+    Args:
+        card_name (str): Name of the card.
+
+    Returns:
+        (str) Display name for the card type (e.g., "Troop", "Spell").
+    """
     return CARD_TYPE_NAMES.get(get_card_type(card_name), "Unknown")

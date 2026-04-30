@@ -40,18 +40,23 @@ class UIRegion:
         return self.y_max - self.y_min
 
     def to_tuple(self) -> Tuple[int, int, int, int]:
-        """Return as (x_min, y_min, x_max, y_max) tuple."""
+        """
+        Return as (x_min, y_min, x_max, y_max) tuple.
+
+        Returns:
+            (Tuple[int, int, int, int]) Tuple of pixel coordinates.
+        """
         return (self.x_min, self.y_min, self.x_max, self.y_max)
 
-    def crop_from_image(self, image):
+    def crop_from_image(self, image: np.ndarray) -> np.ndarray:
         """
         Extract this region from an image.
 
         Args:
-            image: numpy array (height, width, channels)
+            image (np.ndarray): numpy array (height, width, channels).
 
         Returns:
-            Cropped region as numpy array
+            (np.ndarray) Cropped region as numpy array.
         """
         return image[self.y_min : self.y_max, self.x_min : self.x_max]
 
@@ -87,20 +92,28 @@ class UIRegions:
         opponent_right_tower (UIRegion): Opponent right princess tower region.
     """
 
-    def __init__(self, screen_width: int = 1080, screen_height: int = 2400):
+    def __init__(self, screen_width: int = 1080, screen_height: int = 2400) -> None:
         """
         Initialize UI regions for given screen dimensions.
 
         Args:
-            screen_width: Screen width in pixels
-            screen_height: Screen height in pixels
+            screen_width (int): Screen width in pixels.
+            screen_height (int): Screen height in pixels.
+
+        Returns:
+            None
         """
         self.width = screen_width
         self.height = screen_height
         self._build_regions()
 
-    def _build_regions(self):
-        """Build all UI regions based on screen dimensions."""
+    def _build_regions(self) -> None:
+        """
+        Build all UI regions based on screen dimensions.
+
+        Returns:
+            None
+        """
         w, h = self.width, self.height
 
         # ============================================
@@ -357,9 +370,9 @@ class UIRegions:
         return f"UIRegions(width={self.width}, height={self.height})"
 
     def align_elixir_to_image(
-        self, image, black_thresh: int = 10, box_w: int = 40, box_h: int = 27,
+        self, image: np.ndarray, black_thresh: int = 10, box_w: int = 40, box_h: int = 27,
         x_offset: int = 126, y_offset: int = 10
-    ):
+    ) -> Optional[Tuple[int, int, int, Tuple[int, int, int, int]]]:
         """
         Anchor the elixir number box using two independent signals:
           X: leftmost non-black column (game content left edge) + x_offset
@@ -369,6 +382,17 @@ class UIRegions:
         This separates the two axes so each can be independently reliable:
         x_offset is consistent across all videos, and the bar row is found
         adaptively so different arena styles and recording heights all work.
+
+        Args:
+            image (np.ndarray): Full frame as numpy array (H, W, 3).
+            black_thresh (int): Pixel intensity threshold (default 10).
+            box_w (int): Width of the elixir number box in pixels (default 40).
+            box_h (int): Height of the elixir number box in pixels (default 27).
+            x_offset (int): Pixels to offset from leftmost non-black column (default 126).
+            y_offset (int): Pixels to shift up from the bar row (default 10).
+
+        Returns:
+            (Optional[Tuple[int, int, int, Tuple[int, int, int, int]]]) Tuple of (leftmost_column, bar_row, best_run_len, (x1, y1, x2, y2)), or None if alignment fails.
         """
         try:
             import numpy as _np
@@ -447,19 +471,20 @@ class UIRegions:
                 (new_x_min, new_y_min, new_x_max, new_y_max))
 
     def align_timer_to_image(
-        self, image, black_thresh: int = 10, padding: int = 6, width_ratio: float = 0.04
-    ):
+        self, image: np.ndarray, black_thresh: int = 10, padding: int = 6, width_ratio: float = 0.04
+    ) -> Optional[Tuple[int, Tuple[int, int, int, int]]]:
         """
         Heuristic: if the timer ROI appears black, scan the image for the
         rightmost non-black column and place the timer box relative to it.
 
         Args:
-            image: Full frame as a numpy array (H,W,3)
-            black_thresh: Pixel intensity threshold (0-255) below which a
-                          pixel is considered "black".
-            padding: Number of pixels to pad to the right of the detected
-                     non-black column when placing the timer box.
-            width_ratio: Fraction of screen width to use for timer box width.
+            image (np.ndarray): Full frame as a numpy array (H, W, 3).
+            black_thresh (int): Pixel intensity threshold (default 10).
+            padding (int): Pixels to pad to the right of detected column (default 6).
+            width_ratio (float): Fraction of screen width for timer box (default 0.04).
+
+        Returns:
+            (Optional[Tuple[int, Tuple[int, int, int, int]]]) Tuple of (rightmost_column, (x1, y1, x2, y2)), or None if alignment fails.
         """
         try:
             import numpy as _np
@@ -516,14 +541,24 @@ class UIRegions:
         return (rightmost, (new_x_min, new_y_min, new_x_max, new_y_max))
 
     def align_multiplier_to_image(
-        self, image, black_thresh: int = 10, padding: int = -17,
+        self, image: np.ndarray, black_thresh: int = 10, padding: int = -17,
         width_ratio: float = 0.0219, shift_down: int = 17
-    ):
+    ) -> Optional[Tuple[int, Tuple[int, int, int, int]]]:
         """
         Mirror of align_timer_to_image for the x2/x3 multiplier icon.
 
         The icon sits just below and slightly left of the timer, so we use
         the same rightmost non-black column anchor but shift the Y down.
+
+        Args:
+            image (np.ndarray): Full frame as a numpy array (H, W, 3).
+            black_thresh (int): Pixel intensity threshold (default 10).
+            padding (int): Pixels to pad to the right of detected column (default -17).
+            width_ratio (float): Fraction of screen width for icon box (default 0.0219).
+            shift_down (int): Pixels to shift down from timer position (default 17).
+
+        Returns:
+            (Optional[Tuple[int, Tuple[int, int, int, int]]]) Tuple of (rightmost_column, (x1, y1, x2, y2)), or None if alignment fails.
         """
         try:
             import numpy as _np

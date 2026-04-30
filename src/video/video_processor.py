@@ -190,20 +190,35 @@ class VideoProcessor:
         frame_number = int((time_ms / 1000) * self._video_info.fps)
         return self.get_frame_at(frame_number)
 
-    def reset(self):
-        """Reset video to the beginning."""
+    def reset(self) -> None:
+        """
+        Reset video to the beginning.
+
+        Returns:
+            None
+        """
         if self._cap is not None:
             self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-    def close(self):
-        """Release video resources."""
+    def close(self) -> None:
+        """
+        Release video resources.
+
+        Returns:
+            None
+        """
         if self._cap is not None:
             self._cap.release()
             self._cap = None
 
     @property
     def video_info(self) -> Optional[VideoInfo]:
-        """Get info about the currently open video."""
+        """
+        Get info about the currently open video.
+
+        Returns:
+            (Optional[VideoInfo]) VideoInfo object if a video is open, None otherwise.
+        """
         return self._video_info
 
     @property
@@ -212,7 +227,7 @@ class VideoProcessor:
         Get effective FPS after applying frame skip.
 
         Returns:
-            Effective frames per second being processed
+            (float) Effective frames per second being processed.
         """
         if self._video_info is None:
             return 0
@@ -224,7 +239,7 @@ class VideoProcessor:
         Get estimated number of frames that will be processed.
 
         Returns:
-            Approximate number of frames after applying skip
+            (int) Approximate number of frames after applying skip.
         """
         if self._video_info is None:
             return 0

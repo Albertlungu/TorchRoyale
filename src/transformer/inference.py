@@ -48,17 +48,22 @@ class DTInference:
         target_return: Optional[float] = None,
         temperature: float = 1.0,
         randomize_context_actions: bool = False,
-    ):
+    ) -> None:
         """
+        Initialize the Decision Transformer inference wrapper.
+
         Args:
-            checkpoint_path: Path to saved checkpoint (.pt file).
-            device: Torch device string.
-            target_return: Desired return-to-go for conditioning. If None,
+            checkpoint_path (str): Path to saved checkpoint (.pt file).
+            device (str): Torch device string (e.g., "cpu", "cuda").
+            target_return (Optional[float]): Desired return-to-go for conditioning. If None,
                 uses mean + 1 std of training RTG distribution (from checkpoint).
-            temperature: Sampling temperature for action selection. Higher = more random.
+            temperature (float): Sampling temperature for action selection. Higher = more random.
                 1.0 = sample from model distribution, 0.0 = greedy argmax.
-            randomize_context_actions: If True, use random actions in context instead of
+            randomize_context_actions (bool): If True, use random actions in context instead of
                 predictions to break autoregressive feedback loops.
+
+        Returns:
+            None
         """
         checkpoint = torch.load(
             checkpoint_path, map_location=device, weights_only=False
@@ -96,7 +101,13 @@ class DTInference:
         self.K = self.config.context_length
         self._reset_context()
 
-    def _reset_context(self):
+    def _reset_context(self) -> None:
+        """
+        Reset the context window for a new game or periodic reset.
+
+        Returns:
+            None
+        """
         self._states: List[np.ndarray] = []
         self._cards: List[int] = []
         self._positions: List[int] = []
@@ -104,8 +115,16 @@ class DTInference:
         self._current_rtg = self.target_return
         self._steps_since_reset = 0
 
-    def reset(self, target_return: Optional[float] = None):
-        """Reset context for a new game."""
+    def reset(self, target_return: Optional[float] = None) -> None:
+        """
+        Reset context for a new game.
+
+        Args:
+            target_return (Optional[float]): New target return, or None to keep current.
+
+        Returns:
+            None
+        """
         if target_return is not None:
             self.target_return = target_return
         self._reset_context()
@@ -223,8 +242,11 @@ class DTInference:
 
         Useful for applying affordability masking before selecting.
 
+        Args:
+            state_dict (Dict[str, Any]): Current game state dictionary.
+
         Returns:
-            (4,) numpy array of probabilities.
+            (np.ndarray) (4,) numpy array of probabilities for each card slot.
         """
         card_pred, _ = self.predict(state_dict)
         # Pop the state we just added (this was just a probe)
@@ -290,7 +312,7 @@ class DTInference:
 
         return probs
 
-    def update_action(self, card_index: int, tile_position: int, reward: float = 0.0):
+    def update_action(self, card_index: int, tile_position: int, reward: float = 0.0) -> None:
         """
         Record the action actually taken after predict().
 
@@ -298,9 +320,12 @@ class DTInference:
         to keep the context window consistent.
 
         Args:
-            card_index: Hand card index that was played (0-3).
-            tile_position: Flattened tile position (tile_y * 18 + tile_x).
-            reward: Observed reward for this step (optional, decrements RTG).
+            card_index (int): Hand card index that was played (0-3).
+            tile_position (int): Flattened tile position (tile_y * 18 + tile_x).
+            reward (float): Observed reward for this step (optional, decrements RTG).
+
+        Returns:
+            None
         """
         if self.randomize_context_actions:
             # Use random actions to break autoregressive feedback loop

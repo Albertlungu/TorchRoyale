@@ -99,7 +99,12 @@ class FrameState:
     hand_cards: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to JSON-serializable dictionary."""
+        """
+        Convert to JSON-serializable dictionary.
+
+        Returns:
+            (Dict[str, Any]) JSON-serializable dictionary of frame state.
+        """
         return {
             "timestamp_ms": self.timestamp_ms,
             "frame_number": self.frame_number,
@@ -162,16 +167,19 @@ class VideoAnalyzer:
         annotated_frame_interval: int = 30,
         output_dir: str = "output",
         verbose: bool = True,
-    ):
+    ) -> None:
         """
         Initialize video analyzer.
 
         Args:
-            frame_skip: Process every Nth frame (default 6 = ~5 FPS from 30 FPS)
-            save_annotated_frames: Whether to save annotated images
-            annotated_frame_interval: Save every Nth processed frame as image
-            output_dir: Directory for output files
-            verbose: Print progress messages
+            frame_skip (int): Process every Nth frame (default 6 = ~5 FPS from 30 FPS).
+            save_annotated_frames (bool): Whether to save annotated images.
+            annotated_frame_interval (int): Save every Nth processed frame as image.
+            output_dir (str): Directory for output files.
+            verbose (bool): Print progress messages.
+
+        Returns:
+            None
         """
         self.frame_skip = frame_skip
         self.save_frames = save_annotated_frames
@@ -198,8 +206,13 @@ class VideoAnalyzer:
         # Last known tower health (for fallback when OCR fails on princess)
         self._last_tower_health: Dict[str, TowerHealthResult] = {}
 
-    def _initialize_components(self):
-        """Initialize all analysis components."""
+    def _initialize_components(self) -> None:
+        """
+        Initialize all analysis components.
+
+        Returns:
+            None
+        """
         self._video_processor = VideoProcessor(frame_skip=self.frame_skip)
         self._digit_detector = DigitDetector()
         self._phase_tracker = GamePhaseTracker()
@@ -338,17 +351,17 @@ class VideoAnalyzer:
 
         return result
 
-    def _process_frame(self, frame, frame_num: int, timestamp_ms: int) -> FrameState:
+    def _process_frame(self, frame: np.ndarray, frame_num: int, timestamp_ms: int) -> FrameState:
         """
         Process a single frame and extract game state.
 
         Args:
-            frame: BGR image as numpy array
-            frame_num: Frame number in video
-            timestamp_ms: Timestamp in milliseconds
+            frame (np.ndarray): BGR image as numpy array.
+            frame_num (int): Frame number in video.
+            timestamp_ms (int): Timestamp in milliseconds.
 
         Returns:
-            FrameState with all detected information
+            (FrameState) FrameState with all detected information.
         """
         # Default values
         detections = []
@@ -555,8 +568,18 @@ class VideoAnalyzer:
             hand_cards=hand_cards,
         )
 
-    def _save_annotated_frame(self, frame, state: FrameState, frame_num: int):
-        """Save an annotated frame with overlays."""
+    def _save_annotated_frame(self, frame: np.ndarray, state: FrameState, frame_num: int) -> None:
+        """
+        Save an annotated frame with overlays.
+
+        Args:
+            frame (np.ndarray): BGR image as numpy array.
+            state (FrameState): Current frame state.
+            frame_num (int): Frame number for filename.
+
+        Returns:
+            None
+        """
         annotated = frame.copy()
 
         # Add text overlays
@@ -609,7 +632,15 @@ class VideoAnalyzer:
         cv2.imwrite(str(output_path), annotated)
 
     def _generate_summary(self, frame_states: List[FrameState]) -> Dict[str, Any]:
-        """Generate summary statistics from processed frames."""
+        """
+        Generate summary statistics from processed frames.
+
+        Args:
+            frame_states (List[FrameState]): List of processed frame states.
+
+        Returns:
+            (Dict[str, Any]) Dictionary containing summary statistics.
+        """
         if not frame_states:
             return {}
 
@@ -640,8 +671,13 @@ class VideoAnalyzer:
         }
 
 
-def main():
-    """CLI entry point for video analysis."""
+def main() -> None:
+    """
+    CLI entry point for video analysis.
+
+    Returns:
+        None
+    """
     import argparse
 
     parser = argparse.ArgumentParser(description="Analyze Clash Royale game recordings")

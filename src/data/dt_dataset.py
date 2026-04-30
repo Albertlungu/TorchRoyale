@@ -40,13 +40,18 @@ class DecisionTransformerDataset(Dataset):
         context_length: int = 20,
         state_noise_std: float = 0.0,
         rtg_noise_std: float = 0.0,
-    ):
+    ) -> None:
         """
+        Initialize the Decision Transformer dataset.
+
         Args:
-            episodes: List of Episode objects (from episode_builder).
-            context_length: Number of timesteps per sample (K).
-            state_noise_std: Gaussian noise std for state augmentation (0 = disabled).
-            rtg_noise_std: Noise std for RTG augmentation (0 = disabled).
+            episodes (List[Episode]): List of Episode objects (from episode_builder).
+            context_length (int): Number of timesteps per sample (K).
+            state_noise_std (float): Gaussian noise std for state augmentation (0 = disabled).
+            rtg_noise_std (float): Noise std for RTG augmentation (0 = disabled).
+
+        Returns:
+            None
         """
         self.episodes = episodes
         self.context_length = context_length
@@ -61,7 +66,12 @@ class DecisionTransformerDataset(Dataset):
         self._build_index()
 
     def _compute_rtg_stats(self) -> Tuple[float, float]:
-        """Compute global mean and std of returns-to-go across all episodes."""
+        """
+        Compute global mean and std of returns-to-go across all episodes.
+
+        Returns:
+            (Tuple[float, float]) Tuple of (mean, std) for returns-to-go normalization.
+        """
         all_rtg = []
         for ep in self.episodes:
             if ep.returns_to_go is not None:
@@ -76,8 +86,13 @@ class DecisionTransformerDataset(Dataset):
             std = 1.0
         return mean, std
 
-    def _build_index(self):
-        """Build (episode_idx, start, length) tuples for all valid windows."""
+    def _build_index(self) -> None:
+        """
+        Build (episode_idx, start, length) tuples for all valid windows.
+
+        Returns:
+            None
+        """
         K = self.context_length
         for ep_idx, ep in enumerate(self.episodes):
             T = ep.length
@@ -93,6 +108,21 @@ class DecisionTransformerDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> dict:
+        """
+        Get a single sample from the dataset.
+
+        Args:
+            idx (int): Sample index.
+
+        Returns:
+            (dict) Dictionary containing:
+                - states: (K, FEATURE_DIM) tensor
+                - actions_card: (K,) tensor of card indices
+                - actions_pos: (K,) tensor of position indices
+                - returns_to_go: (K, 1) tensor of normalized RTG
+                - timesteps: (K,) tensor of timestep indices
+                - attention_mask: (K,) tensor of attention mask
+        """
         ep_idx, start, length = self.samples[idx]
         ep = self.episodes[ep_idx]
         K = self.context_length

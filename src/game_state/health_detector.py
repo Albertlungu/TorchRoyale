@@ -74,13 +74,16 @@ class TowerHealthDetector:
         _digit_detector: OCR detector instance (DigitDetector or VisionDetector).
     """
 
-    def __init__(self, backend: str = "easyocr", device: str = "auto"):
+    def __init__(self, backend: str = "easyocr", device: str = "auto") -> None:
         """
         Initialize the tower health detector.
 
         Args:
-            backend: "easyocr" or "moondream"
-            device: Device for moondream backend ("auto", "cuda", "cpu", "mps")
+            backend (str): "easyocr" or "moondream".
+            device (str): Device for moondream backend ("auto", "cuda", "cpu", "mps").
+
+        Returns:
+            None
         """
         self._backend = backend
         if backend == "moondream":
@@ -227,7 +230,18 @@ class TowerHealthDetector:
         hp_max: int,
         is_king: bool,
     ) -> TowerHealthResult:
-        """Moondream-based HP detection path."""
+        """
+        Moondream-based HP detection path.
+
+        Args:
+            image (np.ndarray): Full frame (BGR format).
+            hp_region (Tuple[int, int, int, int]): Pixel region (x1, y1, x2, y2) for HP text.
+            hp_max (int): Maximum HP for this tower.
+            is_king (bool): True if this is a king tower.
+
+        Returns:
+            (TowerHealthResult) HP detection result.
+        """
         hp_value = self._digit_detector.detect_hp(image, hp_region, hp_max)
 
         if hp_value is not None:
@@ -262,8 +276,18 @@ class TowerHealthDetector:
         - Player king tower: HP bar is further below center (taller tower)
         - Opponent towers: HP bar is above the tower (near top of bbox)
 
+        Args:
+            cx (int): Tower bounding box center x.
+            cy (int): Tower bounding box center y.
+            bw (int): Tower bounding box width.
+            bh (int): Tower bounding box height.
+            is_opponent (bool): True if opponent tower.
+            img_w (int): Full image width.
+            img_h (int): Full image height.
+            is_king (bool): True if king tower (default False).
+
         Returns:
-            (x1, y1, x2, y2) or None
+            (Optional[Tuple[int, int, int, int]]) Tuple of (x1, y1, x2, y2) pixel coordinates, or None.
         """
         # Wide enough to capture the full HP number
         x1 = max(0, cx - int(bw * 0.4))
@@ -479,7 +503,22 @@ class TowerHealthDetector:
         img_h: int,
         is_king: bool = False,
     ) -> Optional[Tuple[int, int, int, int]]:
-        """Public access to HP region computation for debug drawing."""
+        """
+        Public access to HP region computation for debug drawing.
+
+        Args:
+            tower_cx (int): Tower bounding box center x.
+            tower_cy (int): Tower bounding box center y.
+            tower_w (int): Tower bounding box width.
+            tower_h (int): Tower bounding box height.
+            is_opponent (bool): True if opponent tower.
+            img_w (int): Full image width.
+            img_h (int): Full image height.
+            is_king (bool): True if king tower (default False).
+
+        Returns:
+            (Optional[Tuple[int, int, int, int]]) Tuple of (x1, y1, x2, y2) pixel coordinates, or None.
+        """
         return self._get_hp_region(
             tower_cx, tower_cy, tower_w, tower_h,
             is_opponent, img_w, img_h, is_king=is_king

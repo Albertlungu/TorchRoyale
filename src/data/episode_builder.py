@@ -85,6 +85,14 @@ def _compute_tower_reward(
 
     Positive reward for damaging opponent towers.
     Negative reward for own towers taking damage.
+
+    Args:
+        prev_state (Dict[str, Any]): Previous frame state dictionary.
+        curr_state (Dict[str, Any]): Current frame state dictionary.
+        config (DTConfig): Configuration for reward weights.
+
+    Returns:
+        (float) Computed reward value.
     """
     reward = 0.0
 
@@ -127,7 +135,17 @@ def _get_tower_hp_ratio(
     tower_group: str,
     tower_key: str,
 ) -> float:
-    """Extract HP ratio for a tower from a state dict."""
+    """
+    Extract HP ratio for a tower from a state dict.
+
+    Args:
+        state (Dict[str, Any]): Frame state dictionary.
+        tower_group (str): Key for tower group ("player_towers" or "opponent_towers").
+        tower_key (str): Specific tower key (e.g., "player_left").
+
+    Returns:
+        (float) HP ratio (0.0 to 1.0), or 1.0 if unknown.
+    """
     towers = state.get(tower_group, {})
     tower = towers.get(tower_key, {})
     if tower.get("is_destroyed", False):
@@ -139,7 +157,15 @@ def _get_tower_hp_ratio(
 
 
 def _compute_returns_to_go(rewards: List[float]) -> np.ndarray:
-    """Compute return-to-go at each timestep (reverse cumulative sum)."""
+    """
+    Compute return-to-go at each timestep (reverse cumulative sum).
+
+    Args:
+        rewards (List[float]): List of rewards for each timestep.
+
+    Returns:
+        (np.ndarray) Array of returns-to-go, same length as rewards.
+    """
     rtg = np.zeros(len(rewards), dtype=np.float32)
     running = 0.0
     for t in reversed(range(len(rewards))):
@@ -238,7 +264,16 @@ def build_episode(
 
 
 def _find_card_in_hand(card_name: str, hand_cards: List[str]) -> Optional[int]:
-    """Find the index of a card in the player's hand, handling name variants."""
+    """
+    Find the index of a card in the player's hand, handling name variants.
+
+    Args:
+        card_name (str): Name of the card to find.
+        hand_cards (List[str]): List of card names in hand.
+
+    Returns:
+        (Optional[int]) Index of the card in hand, or None if not found.
+    """
     clean = card_name.lower()
     for suffix in [
         "-in-hand",
@@ -275,7 +310,12 @@ def _detect_match_over_frames(video_path: str, verbose: bool = True) -> List[int
     """
     Scan video for frames containing "Match Over" text using OCR.
 
-    Returns list of timestamps (in milliseconds) where "Match Over" appears.
+    Args:
+        video_path (str): Path to the video file.
+        verbose (bool): Whether to print progress messages.
+
+    Returns:
+        (List[int]) List of timestamps (in milliseconds) where "Match Over" appears.
     """
     if verbose:
         print("Scanning video for 'Match Over' text...")
@@ -356,12 +396,17 @@ def _detect_game_boundaries(
     """
     Detect boundaries between multiple games in a single video.
 
-    Returns list of indices where new games start (first game starts at 0).
-
     Detects new games by looking for:
     - "Match Over" text detected via OCR
     - All towers resetting to full health
     - Elixir resetting to starting value
+
+    Args:
+        training_pairs (List[Dict[str, Any]]): List of (state, action) training pairs.
+        match_over_timestamps (Optional[List[int]]): Timestamps where "Match Over" was detected.
+
+    Returns:
+        (List[int]) List of indices where new games start (first game starts at 0).
     """
     if not training_pairs:
         return [0]
@@ -405,7 +450,16 @@ def _detect_game_boundaries(
 
 
 def _all_towers_full(state: Dict[str, Any], tower_group: str) -> bool:
-    """Check if all towers in a group are at full health."""
+    """
+    Check if all towers in a group are at full health.
+
+    Args:
+        state (Dict[str, Any]): Frame state dictionary.
+        tower_group (str): Key for tower group ("player_towers" or "opponent_towers").
+
+    Returns:
+        (bool) True if all towers are at full health, False otherwise.
+    """
     towers = state.get(tower_group, {})
     for tower_key in ["left", "king", "right"]:
         tower_key_full = f"player_{tower_key}" if "player" in tower_group else f"opponent_{tower_key}"
@@ -677,7 +731,12 @@ def build_episodes_from_videos(
 
 
 def main() -> int:
-    """CLI entry point for episode building."""
+    """
+    CLI entry point for episode building.
+
+    Returns:
+        (int) Exit code (0 for success, non-zero for failure).
+    """
     import argparse
     import glob
 

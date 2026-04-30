@@ -39,11 +39,16 @@ class VisionDetector:
         _device (torch.device): Resolved device.
     """
 
-    def __init__(self, device: str = "auto", preload: bool = False):
+    def __init__(self, device: str = "auto", preload: bool = False) -> None:
         """
+        Initialize the VisionDetector with Moondream2 model.
+
         Args:
-            device: "auto", "cuda", "cpu", or "mps".
-            preload: If True, load model immediately instead of on first use.
+            device (str): "auto", "cuda", "cpu", or "mps".
+            preload (bool): If True, load model immediately instead of on first use.
+
+        Returns:
+            None
         """
         self._model = None
         self._tokenizer = None
@@ -53,8 +58,13 @@ class VisionDetector:
         if preload:
             self._load_model()
 
-    def _load_model(self):
-        """Load Moondream2 model and tokenizer."""
+    def _load_model(self) -> None:
+        """
+        Load Moondream2 model and tokenizer.
+
+        Returns:
+            None
+        """
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -113,7 +123,15 @@ class VisionDetector:
         return answer.strip()
 
     def _extract_number(self, text: str) -> Optional[int]:
-        """Extract the first integer from model response text."""
+        """
+        Extract the first integer from model response text.
+
+        Args:
+            text (str): Model response text.
+
+        Returns:
+            (Optional[int]) First integer found, or None if no integer present.
+        """
         numbers = re.findall(r"\d+", text)
         if numbers:
             return int(numbers[0])
@@ -241,7 +259,16 @@ class VisionDetector:
         image: np.ndarray,
         region: Tuple[int, int, int, int],
     ) -> DetectionResult:
-        """Detect card elixir cost from a card region."""
+        """
+        Detect card elixir cost from a card region.
+
+        Args:
+            image (np.ndarray): Full frame (BGR format).
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) of card region.
+
+        Returns:
+            (DetectionResult) Detection result with elixir cost value.
+        """
         return self.detect_elixir(image, region)
 
     def detect_digits_in_region(
@@ -349,5 +376,11 @@ class VisionDetector:
         return None
 
     def __repr__(self) -> str:
+        """
+        String representation of the VisionDetector.
+
+        Returns:
+            (str) String showing model name and load status.
+        """
         loaded = self._model is not None
         return f"VisionDetector(moondream2, loaded={loaded})"

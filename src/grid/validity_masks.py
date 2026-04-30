@@ -81,12 +81,15 @@ class PlacementValidator:
         _masks (Dict[CardType, np.ndarray]): Pre-computed placement masks.
     """
 
-    def __init__(self, mapper: CoordinateMapper):
+    def __init__(self, mapper: CoordinateMapper) -> None:
         """
         Initialize the placement validator.
 
         Args:
-            mapper: CoordinateMapper instance for grid dimensions
+            mapper (CoordinateMapper): CoordinateMapper instance for grid dimensions.
+
+        Returns:
+            None
         """
         self.mapper = mapper
         self.width = mapper.GRID_WIDTH
@@ -96,8 +99,13 @@ class PlacementValidator:
         self._masks: Dict[CardType, np.ndarray] = {}
         self._build_masks()
 
-    def _build_masks(self):
-        """Pre-compute placement masks for each card type."""
+    def _build_masks(self) -> None:
+        """
+        Pre-compute placement masks for each card type.
+
+        Returns:
+            None
+        """
         self._masks[CardType.TROOP] = self._build_troop_mask()
         self._masks[CardType.BUILDING] = self._build_building_mask()
         self._masks[CardType.SPELL] = self._build_spell_mask()
@@ -114,6 +122,9 @@ class PlacementValidator:
         Troops cannot be placed:
         - On enemy side (rows 0-14)
         - In the river (rows 15-16, except bridges)
+
+        Returns:
+            (np.ndarray) 32x18 float32 array where 1.0 = valid, 0.0 = invalid.
         """
         mask = np.zeros((self.height, self.width), dtype=np.float32)
 
@@ -139,6 +150,9 @@ class PlacementValidator:
 
         For simplicity, we'll allow rows 20-31 and columns 2-15.
         Fine-tune these values based on actual game testing.
+
+        Returns:
+            (np.ndarray) 32x18 float32 array where 1.0 = valid, 0.0 = invalid.
         """
         mask = np.zeros((self.height, self.width), dtype=np.float32)
 
@@ -159,6 +173,9 @@ class PlacementValidator:
         Build placement mask for spells.
 
         Spells can be placed anywhere on the arena.
+
+        Returns:
+            (np.ndarray) 32x18 float32 array with all 1.0 (all valid).
         """
         return np.ones((self.height, self.width), dtype=np.float32)
 
@@ -176,7 +193,15 @@ class PlacementValidator:
         return self._masks[card_type].copy()
 
     def get_mask_by_type(self, card_type: CardType) -> np.ndarray:
-        """Get the placement mask for a card type."""
+        """
+        Get the placement mask for a card type.
+
+        Args:
+            card_type (CardType): Type of card (TROOP, BUILDING, SPELL, LOG_SPELL).
+
+        Returns:
+            (np.ndarray) 32x18 float32 placement mask.
+        """
         return self._masks[card_type].copy()
 
     def is_valid_placement(self, card_name: str, tile_x: int, tile_y: int) -> bool:
@@ -239,10 +264,10 @@ class PlacementValidator:
         Create a text visualization of the placement mask.
 
         Args:
-            card_name: Name of the card
+            card_name (str): Name of the card.
 
         Returns:
-            String visualization of the mask
+            (str) String visualization of the mask with legend.
         """
         mask = self.get_mask(card_name)
         card_type = CARD_TYPES.get(card_name, CardType.TROOP)

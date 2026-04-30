@@ -70,8 +70,13 @@ class OpponentElixirTracker:
         _tracked_card_instances (Set[str]): Unique card IDs already counted.
     """
 
-    def __init__(self):
-        """Initialize the opponent elixir tracker."""
+    def __init__(self) -> None:
+        """
+        Initialize the opponent elixir tracker.
+
+        Returns:
+            None
+        """
         self.current_elixir: float = ElixirConstants.STARTING_ELIXIR
         self.last_update_ms: int = 0
         self.game_phase: GamePhase = GamePhase.SINGLE_ELIXIR
@@ -84,8 +89,13 @@ class OpponentElixirTracker:
         # Format: "card_name_tile_x_tile_y"
         self._tracked_card_instances: Set[str] = set()
 
-    def reset(self):
-        """Reset tracker for a new game."""
+    def reset(self) -> None:
+        """
+        Reset tracker for a new game.
+
+        Returns:
+            None
+        """
         self.current_elixir = ElixirConstants.STARTING_ELIXIR
         self.last_update_ms = 0
         self.game_phase = GamePhase.SINGLE_ELIXIR
@@ -202,10 +212,10 @@ class OpponentElixirTracker:
         Get total elixir spent by opponent.
 
         Args:
-            since_ms (int): Only count plays after this timestamp (None = all)
+            since_ms (Optional[int]): Only count plays after this timestamp (None = all).
 
         Returns:
-            (int) Total elixir spent
+            (int) Total elixir spent.
         """
         total = 0
         for event in self.card_history:
@@ -218,10 +228,10 @@ class OpponentElixirTracker:
         Get the most recent card plays.
 
         Args:
-            last_n (int): Number of recent plays to return
+            last_n (int): Number of recent plays to return.
 
         Returns:
-            List of recent CardPlayEvents (most recent first)
+            (List[CardPlayEvent]) List of recent CardPlayEvents (most recent first).
         """
         return list(reversed(self.card_history[-last_n:]))
 
@@ -236,11 +246,11 @@ class OpponentElixirTracker:
         This is a rough estimate based on card plays in history.
 
         Args:
-            target_ms (int): Target timestamp
-            from_ms (int): Start timestamp (None = game start)
+            target_ms (int): Target timestamp.
+            from_ms (Optional[int]): Start timestamp (None = game start).
 
         Returns:
-            Estimated elixir at that time
+            (float) Estimated elixir at that time.
         """
         if from_ms is None:
             from_ms = 0
@@ -262,18 +272,34 @@ class OpponentElixirTracker:
 
     @property
     def total_cards_played(self) -> int:
-        """Get total number of cards played by opponent."""
+        """
+        Get total number of cards played by opponent.
+
+        Returns:
+            (int) Total number of cards played.
+        """
         return len(self.card_history)
 
     @property
     def average_elixir_per_card(self) -> float:
-        """Get average elixir cost of opponent's cards."""
+        """
+        Get average elixir cost of opponent's cards.
+
+        Returns:
+            (float) Average elixir cost per card.
+        """
         if not self.card_history:
             return 0.0
         total_cost = sum(e.elixir_cost for e in self.card_history)
         return total_cost / len(self.card_history)
 
     def __repr__(self) -> str:
+        """
+        String representation of the OpponentElixirTracker.
+
+        Returns:
+            (str) String showing elixir, phase, and cards played.
+        """
         return (
             f"OpponentElixirTracker("
             f"elixir={self.current_elixir:.1f}, "
@@ -296,15 +322,25 @@ class PlayerElixirTracker:
         confidence (float): Confidence of current detection (0-1).
     """
 
-    def __init__(self):
-        """Initialize player elixir tracker."""
+    def __init__(self) -> None:
+        """
+        Initialize player elixir tracker.
+
+        Returns:
+            None
+        """
         self.current_elixir: int = ElixirConstants.STARTING_ELIXIR
         self.last_detected: int = ElixirConstants.STARTING_ELIXIR
         self.detection_history: List[int] = []
         self.confidence: float = 1.0
 
-    def reset(self):
-        """Reset for new game."""
+    def reset(self) -> None:
+        """
+        Reset for new game.
+
+        Returns:
+            None
+        """
         self.current_elixir = ElixirConstants.STARTING_ELIXIR
         self.last_detected = ElixirConstants.STARTING_ELIXIR
         self.detection_history = []
@@ -347,4 +383,10 @@ class PlayerElixirTracker:
         return self.current_elixir
 
     def __repr__(self) -> str:
+        """
+        String representation of the PlayerElixirTracker.
+
+        Returns:
+            (str) String showing elixir and confidence.
+        """
         return f"PlayerElixirTracker(elixir={self.current_elixir}, confidence={self.confidence:.2f})"

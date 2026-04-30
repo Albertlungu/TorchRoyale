@@ -54,7 +54,16 @@ class ArenaBounds:
         return self.y_max - self.y_min
 
     def contains_pixel(self, px: int, py: int) -> bool:
-        """Check if a pixel coordinate is within the arena bounds."""
+        """
+        Check if a pixel coordinate is within the arena bounds.
+
+        Args:
+            px (int): Pixel x coordinate.
+            py (int): Pixel y coordinate.
+
+        Returns:
+            (bool) True if the pixel is within the arena bounds, False otherwise.
+        """
         return (self.x_min <= px <= self.x_max and
                 self.y_min <= py <= self.y_max)
 
@@ -96,13 +105,21 @@ class CoordinateMapper:
         Initialize the coordinate mapper.
 
         Args:
-            bounds: Arena pixel boundaries. If None, uses default estimates.
+            bounds (Optional[ArenaBounds]): Arena pixel boundaries. If None, uses default estimates.
+
+        Returns:
+            None
         """
         self.bounds = bounds or ArenaBounds()
         self._calculate_tile_dimensions()
 
-    def _calculate_tile_dimensions(self):
-        """Calculate the pixel size of each tile."""
+    def _calculate_tile_dimensions(self) -> None:
+        """
+        Calculate the pixel size of each tile.
+
+        Returns:
+            None
+        """
         self.tile_width = self.bounds.arena_width / self.GRID_WIDTH
         self.tile_height = self.bounds.arena_height / self.GRID_HEIGHT
 
@@ -111,11 +128,11 @@ class CoordinateMapper:
         Convert pixel coordinates to tile coordinates.
 
         Args:
-            px: Pixel x coordinate (from Roboflow detection)
-            py: Pixel y coordinate (from Roboflow detection)
+            px (int): Pixel x coordinate (from Roboflow detection).
+            py (int): Pixel y coordinate (from Roboflow detection).
 
         Returns:
-            Tuple of (tile_x, tile_y) where:
+            (Tuple[int, int]) Tuple of (tile_x, tile_y) where:
             - tile_x is in range [0, 17]
             - tile_y is in range [0, 31]
 
@@ -141,12 +158,12 @@ class CoordinateMapper:
         Convert tile coordinates to pixel coordinates.
 
         Args:
-            tile_x: Tile x coordinate (0-17)
-            tile_y: Tile y coordinate (0-31)
-            center: If True, returns center of tile. If False, returns top-left.
+            tile_x (int): Tile x coordinate (0-17).
+            tile_y (int): Tile y coordinate (0-31).
+            center (bool): If True, returns center of tile. If False, returns top-left.
 
         Returns:
-            Tuple of (pixel_x, pixel_y)
+            (Tuple[int, int]) Tuple of (pixel_x, pixel_y).
         """
         offset = 0.5 if center else 0.0
 
@@ -159,8 +176,12 @@ class CoordinateMapper:
         """
         Get the pixel bounding box for a tile.
 
+        Args:
+            tile_x (int): Tile x coordinate (0-17).
+            tile_y (int): Tile y coordinate (0-31).
+
         Returns:
-            Tuple of (x_min, y_min, x_max, y_max) in pixels
+            (Tuple[int, int, int, int]) Tuple of (x_min, y_min, x_max, y_max) in pixels.
         """
         x_min = int(tile_x * self.tile_width + self.bounds.x_min)
         y_min = int(tile_y * self.tile_height + self.bounds.y_min)
@@ -170,15 +191,40 @@ class CoordinateMapper:
         return (x_min, y_min, x_max, y_max)
 
     def is_on_your_side(self, tile_y: int) -> bool:
-        """Check if a tile row is on your side of the arena."""
+        """
+        Check if a tile row is on your side of the arena.
+
+        Args:
+            tile_y (int): Tile y coordinate (0-31).
+
+        Returns:
+            (bool) True if the tile is on your side, False otherwise.
+        """
         return tile_y >= 17
 
     def is_on_enemy_side(self, tile_y: int) -> bool:
-        """Check if a tile row is on the enemy side of the arena."""
+        """
+        Check if a tile row is on the enemy side of the arena.
+
+        Args:
+            tile_y (int): Tile y coordinate (0-31).
+
+        Returns:
+            (bool) True if the tile is on the enemy side, False otherwise.
+        """
         return tile_y <= 14
 
     def is_river(self, tile_x: int, tile_y: int) -> bool:
-        """Check if a tile is part of the river."""
+        """
+        Check if a tile is part of the river.
+
+        Args:
+            tile_x (int): Tile x coordinate (0-17).
+            tile_y (int): Tile y coordinate (0-31).
+
+        Returns:
+            (bool) True if the tile is part of the river (not a bridge), False otherwise.
+        """
         if tile_y not in self.RIVER_ROWS:
             return False
         # Bridges are not river
@@ -187,7 +233,16 @@ class CoordinateMapper:
         return True
 
     def is_bridge(self, tile_x: int, tile_y: int) -> bool:
-        """Check if a tile is a bridge."""
+        """
+        Check if a tile is a bridge.
+
+        Args:
+            tile_x (int): Tile x coordinate (0-17).
+            tile_y (int): Tile y coordinate (0-31).
+
+        Returns:
+            (bool) True if the tile is a bridge, False otherwise.
+        """
         return tile_y in self.RIVER_ROWS and tile_x in self.BRIDGE_TILES_X
 
     # Reference values calibrated from 1170x2532 screenshots
@@ -207,8 +262,11 @@ class CoordinateMapper:
         - Tile size: 62x50 px
 
         Args:
-            image_width: Width of the screenshot in pixels
-            image_height: Height of the screenshot in pixels
+            image_width (int): Width of the screenshot in pixels.
+            image_height (int): Height of the screenshot in pixels.
+
+        Returns:
+            None
         """
         scale_x = image_width / self._REF_WIDTH
         scale_y = image_height / self._REF_HEIGHT
@@ -228,7 +286,7 @@ class CoordinateMapper:
         )
         self._calculate_tile_dimensions()
 
-    def calibrate_from_frame(self, frame, black_thresh: int = 30) -> None:
+    def calibrate_from_frame(self, frame: np.ndarray, black_thresh: int = 30) -> None:
         """
         Calibrate arena bounds from an actual video frame.
 
@@ -240,6 +298,13 @@ class CoordinateMapper:
 
         Falls back to calibrate_from_image if the content bounds cannot be
         detected (e.g. a pure portrait frame with no black bars).
+
+        Args:
+            frame (np.ndarray): Input video frame (BGR or grayscale).
+            black_thresh (int): Pixel intensity threshold for black bar detection (default 30).
+
+        Returns:
+            None
         """
         try:
             import numpy as _np
@@ -291,7 +356,12 @@ class CoordinateMapper:
         self._calculate_tile_dimensions()
 
     def to_dict(self) -> Dict[str, Any]:
-        """Export configuration to dictionary."""
+        """
+        Export configuration to dictionary.
+
+        Returns:
+            (Dict[str, Any]) Dictionary containing grid configuration.
+        """
         return {
             "grid_width": self.GRID_WIDTH,
             "grid_height": self.GRID_HEIGHT,
@@ -316,8 +386,11 @@ def create_grid_visualization(mapper: CoordinateMapper) -> List[List[str]]:
     """
     Create a text visualization of the grid for debugging.
 
+    Args:
+        mapper (CoordinateMapper): Coordinate mapper instance.
+
     Returns:
-        2D list representing the grid with markers for special tiles.
+        (List[List[str]]) 2D list representing the grid with markers for special tiles.
     """
     grid = []
     for y in range(mapper.GRID_HEIGHT):
@@ -336,7 +409,15 @@ def create_grid_visualization(mapper: CoordinateMapper) -> List[List[str]]:
 
 
 def print_grid(mapper: CoordinateMapper) -> None:
-    """Print a visual representation of the grid."""
+    """
+    Print a visual representation of the grid.
+
+    Args:
+        mapper (CoordinateMapper): Coordinate mapper instance.
+
+    Returns:
+        None
+    """
     grid = create_grid_visualization(mapper)
     print(f"Grid: {mapper.GRID_WIDTH}x{mapper.GRID_HEIGHT}")
     print("Legend: . = your side, E = enemy side, ~ = river, B = bridge")

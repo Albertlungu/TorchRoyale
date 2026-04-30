@@ -34,15 +34,25 @@ class GamePhaseTracker:
         _last_timer_seconds (Optional[int]): Last detected timer value.
     """
 
-    def __init__(self):
-        """Initialize the game phase tracker."""
+    def __init__(self) -> None:
+        """
+        Initialize the game phase tracker.
+
+        Returns:
+            None
+        """
         self.current_phase = GamePhase.SINGLE_ELIXIR
         self.is_sudden_death = False
         self.overtime_start_ms: Optional[int] = None
         self._last_timer_seconds: Optional[int] = None
 
-    def reset(self):
-        """Reset tracker for a new game."""
+    def reset(self) -> None:
+        """
+        Reset tracker for a new game.
+
+        Returns:
+            None
+        """
         self.current_phase = GamePhase.SINGLE_ELIXIR
         self.is_sudden_death = False
         self.overtime_start_ms = None
@@ -123,12 +133,15 @@ class GamePhaseTracker:
 
         return self.current_phase
 
-    def force_sudden_death(self, timestamp_ms: int):
+    def force_sudden_death(self, timestamp_ms: int) -> None:
         """
         Force transition to sudden death (e.g., when tie is detected).
 
         Args:
-            timestamp_ms: Current timestamp for overtime tracking
+            timestamp_ms (int): Current timestamp for overtime tracking.
+
+        Returns:
+            None
         """
         self.is_sudden_death = True
         self.overtime_start_ms = timestamp_ms
@@ -140,7 +153,7 @@ class GamePhaseTracker:
         Get current elixir multiplier.
 
         Returns:
-            1, 2, or 3 based on current phase
+            (int) 1, 2, or 3 based on current phase.
         """
         if self.current_phase == GamePhase.TRIPLE_ELIXIR:
             return 3
@@ -151,15 +164,31 @@ class GamePhaseTracker:
 
     @property
     def is_game_over(self) -> bool:
-        """Check if game has ended."""
+        """
+        Check if game has ended.
+
+        Returns:
+            (bool) True if the game has ended, False otherwise.
+        """
         return self.current_phase == GamePhase.GAME_OVER
 
     @property
     def is_overtime(self) -> bool:
-        """Check if in sudden death overtime."""
+        """
+        Check if in sudden death overtime.
+
+        Returns:
+            (bool) True if in sudden death overtime, False otherwise.
+        """
         return self.is_sudden_death
 
     def __repr__(self) -> str:
+        """
+        String representation of the GamePhaseTracker.
+
+        Returns:
+            (str) String showing phase, multiplier, and overtime status.
+        """
         return (
             f"GamePhaseTracker(phase={self.current_phase.value}, "
             f"multiplier={self.elixir_multiplier}, "
