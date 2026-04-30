@@ -38,26 +38,15 @@ class MLStrategy:
 
     Falls back to the most expensive affordable card at the center
     of the player's side if no models are loaded.
-
-    Attributes:
-        _model_dir (Path): Directory containing trained models.
-        _stage1: Stage 1 card prediction model (RandomForest).
-        _stage2: Stage 2 position prediction model (RandomForest).
-        _models_loaded (bool): Whether models are loaded.
-        _mapper (CoordinateMapper): Coordinate mapping utility.
-        _validator (PlacementValidator): Placement validation utility.
     """
 
-    def __init__(self, model_dir: Optional[str] = None) -> None:
+    def __init__(self, model_dir: Optional[str] = None):
         """
         Initialize the strategy.
 
         Args:
-            model_dir (Optional[str]): Directory containing stage1_card.pkl and stage2_pos.pkl.
-                               If None, uses data/models/ relative to project root.
-
-        Returns:
-            None
+            model_dir: Directory containing stage1_card.pkl and stage2_pos.pkl.
+                       If None, uses data/models/ relative to project root.
         """
         self._model_dir = Path(model_dir) if model_dir else DEFAULT_MODEL_DIR
         self._stage1 = None
@@ -69,13 +58,8 @@ class MLStrategy:
 
         self._load_models()
 
-    def _load_models(self) -> None:
-        """
-        Attempt to load trained models from disk.
-
-        Returns:
-            None
-        """
+    def _load_models(self):
+        """Attempt to load trained models from disk."""
         stage1_path = self._model_dir / "stage1_card.pkl"
         stage2_path = self._model_dir / "stage2_pos.pkl"
 
@@ -86,12 +70,7 @@ class MLStrategy:
 
     @property
     def is_ready(self) -> bool:
-        """
-        Whether trained models are loaded and ready for inference.
-
-        Returns:
-            (bool) True if models are loaded, False otherwise.
-        """
+        """Whether trained models are loaded and ready for inference."""
         return self._models_loaded
 
     def recommend(self, state: Dict[str, Any]) -> Optional[Tuple[str, int, int]]:
@@ -138,12 +117,12 @@ class MLStrategy:
         Use trained models for prediction.
 
         Args:
-            state (Dict[str, Any]): Current game state dictionary.
-            hand_cards (List[str]): List of cards in hand.
-            affordable_indices (List[int]): Indices of affordable cards.
-
+            state: Dict[str, Any]
+            hand_cards: List[str],
+            affordable_indices: List[int],
         Returns:
-            (Optional[Tuple[str, int, int]]) Tuple of (card_name, tile_x, tile_y), or None.
+            (str, int, int): (card_name, tile_x, tile_y)
+
         """
         features = encode(state).reshape(1, -1)
 
@@ -202,13 +181,6 @@ class MLStrategy:
 
         Picks the most expensive affordable card and places it near
         the center of the player's side.
-
-        Args:
-            hand_cards (List[str]): List of cards in hand.
-            affordable_indices (List[int]): Indices of affordable cards.
-
-        Returns:
-            (Optional[Tuple[str, int, int]]) Tuple of (card_name, tile_x, tile_y), or None.
         """
         best_idx = max(affordable_indices, key=lambda i: get_elixir_cost(hand_cards[i]))
         card_name = hand_cards[best_idx]
@@ -240,17 +212,6 @@ class DTStrategy:
     Uses a trained Decision Transformer that conditions on desired
     game outcomes to predict card placements. Maintains a rolling
     context window of recent game states and actions.
-
-    Attributes:
-        _config (InferenceConfig): Inference configuration.
-        _checkpoint_path (str): Path to model checkpoint.
-        _target_return (float): Target return-to-go.
-        _device (str): Inference device string.
-        _temperature (float): Sampling temperature.
-        _mapper (CoordinateMapper): Coordinate mapping utility.
-        _validator (PlacementValidator): Placement validation utility.
-        _inference (Optional[DTInference]): DT inference engine.
-        _models_loaded (bool): Whether model is loaded.
     """
 
     def __init__(
@@ -260,19 +221,16 @@ class DTStrategy:
         device: Optional[str] = None,
         temperature: Optional[float] = None,
         config_path: Optional[str] = None,
-    ) -> None:
+    ):
         """
         Initialize Decision Transformer strategy.
 
         Args:
-            checkpoint_path (Optional[str]): Override config checkpoint path.
-            target_return (Optional[float]): Override config target return.
-            device (Optional[str]): Override config device.
-            temperature (Optional[float]): Override config temperature.
-            config_path (Optional[str]): Path to inference config YAML (default: configs/inference.yaml).
-
-        Returns:
-            None
+            checkpoint_path: Override config checkpoint path
+            target_return: Override config target return
+            device: Override config device
+            temperature: Override config temperature
+            config_path: Path to inference config YAML (default: configs/inference.yaml)
         """
         # Load config
         self._config = InferenceConfig(config_path)
@@ -290,13 +248,7 @@ class DTStrategy:
 
         self._load_model()
 
-    def _load_model(self) -> None:
-        """
-        Load the Decision Transformer model from checkpoint.
-
-        Returns:
-            None
-        """
+    def _load_model(self):
         if not Path(self._checkpoint_path).exists():
             return
 
@@ -313,21 +265,10 @@ class DTStrategy:
 
     @property
     def is_ready(self) -> bool:
-        """
-        Whether the Decision Transformer model is loaded.
-
-        Returns:
-            (bool) True if model is loaded, False otherwise.
-        """
         return self._models_loaded
 
-    def reset_game(self) -> None:
-        """
-        Call at the start of each new game to reset context.
-
-        Returns:
-            None
-        """
+    def reset_game(self):
+        """Call at the start of each new game to reset context."""
         if self._inference:
             self._inference.reset()
 
@@ -336,12 +277,6 @@ class DTStrategy:
         Recommend a card placement given the current game state.
 
         Same interface as MLStrategy.recommend().
-
-        Args:
-            state (Dict[str, Any]): Current game state dictionary.
-
-        Returns:
-            (Optional[Tuple[str, int, int]]) Tuple of (card_name, tile_x, tile_y), or None.
         """
         hand_cards = state.get("hand_cards", [])
         player_elixir = state.get("player_elixir", 0)
@@ -401,16 +336,6 @@ class DTStrategy:
         hand_cards: List[str],
         affordable_indices: List[int],
     ) -> Optional[Tuple[str, int, int]]:
-        """
-        Fallback heuristic for DTStrategy when model is not loaded.
-
-        Args:
-            hand_cards (List[str]): List of cards in hand.
-            affordable_indices (List[int]): Indices of affordable cards.
-
-        Returns:
-            (Optional[Tuple[str, int, int]]) Tuple of (card_name, tile_x, tile_y), or None.
-        """
         best_idx = max(affordable_indices, key=lambda i: get_elixir_cost(hand_cards[i]))
         card_name = hand_cards[best_idx]
 
