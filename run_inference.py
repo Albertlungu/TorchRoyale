@@ -12,6 +12,13 @@ from src.overlay.inference_runner import InferenceRunner
 
 
 def main():
+    """
+    The main interface for running inference on a replay video using Inference Runner
+    Args:
+        None
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Run DT inference on replay video")
     parser.add_argument("video", help="Path to video file")
     parser.add_argument("--frame-skip", type=int, default=6, help="Frame skip (default: 6)")

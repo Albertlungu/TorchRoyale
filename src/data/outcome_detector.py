@@ -15,6 +15,17 @@ _ocr_reader = None
 
 
 class GameOutcome(Enum):
+    """
+    Enum representing the possible outcomes of a Clash Royale match.
+
+    Used by the OutcomeDetector to report whether the player won,
+    lost, or if the outcome is unknown.
+
+    Attributes:
+        WIN (str): Player won the match.
+        LOSS (str): Player lost the match.
+        UNKNOWN (str): Outcome could not be determined.
+    """
     WIN = "win"
     LOSS = "loss"
     UNKNOWN = "unknown"

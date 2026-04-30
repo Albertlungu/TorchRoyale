@@ -47,6 +47,14 @@ class OpponentElixirTracker:
     - Opponent starts with 5 elixir
     - Max elixir is 10 (can't exceed this)
     - Each card costs a known amount of elixir
+
+    Attributes:
+        current_elixir (float): how much elixir you currently have
+        last_update_ms (int): last updated time
+        game_phase (GamePhase): the game phase
+        card_history (List): Played cards
+        _previous_on_field_cards (Set): cards that are currently on the field
+        _tracked_card_instances (Set): unique card IDs
     """
 
     def __init__(self):
@@ -82,14 +90,14 @@ class OpponentElixirTracker:
         Update opponent elixir estimate based on current state.
 
         Args:
-            timestamp_ms: Current frame timestamp in milliseconds
-            game_phase: Current game phase (affects regen rate)
-            opponent_detections: List of opponent card detections from this frame
+            timestamp_ms (int) : Current frame timestamp in milliseconds
+            game_phase (GamePhase): Current game phase (affects regen rate)
+            opponent_detection (List): List of opponent card detections from this frame
                                 Each detection should have: class_name, is_on_field,
                                 tile_x, tile_y attributes
 
         Returns:
-            Estimated opponent elixir (0.0 - 10.0)
+            float (Estimated opponent elixir (0.0 - 10.0)) 
         """
         # Calculate time delta
         delta_ms = timestamp_ms - self.last_update_ms
@@ -142,7 +150,7 @@ class OpponentElixirTracker:
         card that persists across frames.
 
         Args:
-            detections: List of opponent detections
+            detections (List): List of opponent detections
 
         Returns:
             List of newly played card names
@@ -181,10 +189,10 @@ class OpponentElixirTracker:
         Get total elixir spent by opponent.
 
         Args:
-            since_ms: Only count plays after this timestamp (None = all)
+            since_ms (int): Only count plays after this timestamp (None = all)
 
         Returns:
-            Total elixir spent
+            (int) Total elixir spent
         """
         total = 0
         for event in self.card_history:
@@ -197,7 +205,7 @@ class OpponentElixirTracker:
         Get the most recent card plays.
 
         Args:
-            last_n: Number of recent plays to return
+            last_n (int): Number of recent plays to return
 
         Returns:
             List of recent CardPlayEvents (most recent first)
@@ -215,8 +223,8 @@ class OpponentElixirTracker:
         This is a rough estimate based on card plays in history.
 
         Args:
-            target_ms: Target timestamp
-            from_ms: Start timestamp (None = game start)
+            target_ms (int): Target timestamp
+            from_ms (int): Start timestamp (None = game start)
 
         Returns:
             Estimated elixir at that time

@@ -35,6 +35,9 @@ class InferenceRunner:
         analysis_output_dir: str = "output/analysis",
         frame_skip: int = 6,
     ):
+        """
+        Initialization
+        """
         self._video_path = video_path
         self._checkpoint_path = checkpoint_path
         self._output_jsonl = Path(output_jsonl)

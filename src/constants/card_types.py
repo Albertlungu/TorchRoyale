@@ -19,6 +19,18 @@ from typing import Dict, Set
 
 
 class CardType(Enum):
+    """
+    Enum categorizing Clash Royale cards into types for strategy reference.
+
+    Used to identify win conditions, defensive cards, spells, and buildings
+    throughout the game logic and analysis.
+
+    Attributes:
+        TROOP (str): Units that can move and attack.
+        SPELL (str): Temporary effects cast on the battlefield.
+        BUILDING (str): Stationary structures that decay over time.
+        TOWER_TROOP (str): Units that stay on crown towers.
+    """
     TROOP = "troop"
     SPELL = "spell"
     BUILDING = "building"
