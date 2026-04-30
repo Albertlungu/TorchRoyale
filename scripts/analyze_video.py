@@ -23,12 +23,14 @@ from src.overlay.analyzer import VideoAnalyzer
 def main() -> None:
     """Parse arguments and run the video analyzer."""
     parser = argparse.ArgumentParser(
-        description="Analyze a Clash Royale replay video with KataCR detection."
+        description="Analyze a Clash Royale replay video with dual-model detection."
     )
     parser.add_argument("video", help="Path to the replay video file.")
     parser.add_argument("--output-dir", default="output/analysis")
     parser.add_argument("--frame-skip", type=int, default=6)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--cicadas-weights", default="data/models/onfield/cicadas_best.pt")
+    parser.add_argument("--visionbot-weights", default="data/models/onfield/visionbot_best.pt")
     parser.add_argument("--preload-ocr", action="store_true")
     args = parser.parse_args()
 
@@ -37,6 +39,8 @@ def main() -> None:
         frame_skip=args.frame_skip,
         device=args.device,
         preload_ocr=args.preload_ocr,
+        cicadas_weights=args.cicadas_weights,
+        visionbot_weights=args.visionbot_weights,
     )
     analyzer.analyze_video(args.video)
 

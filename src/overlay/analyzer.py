@@ -29,7 +29,7 @@ import cv2
 
 from src.detection.hand_classifier import HandClassifier
 from src.detection.hand_tracker import HandTracker
-from src.detection.katacr import KataCRDetector
+from src.detection.dual_model_detector import DualModelDetector
 from src.ocr.detector import DigitDetector
 from src.ocr.regions import UIRegions
 from src.types import DetectionDict, FrameDict, VideoInfoDict
@@ -50,20 +50,28 @@ class VideoAnalyzer:
         device: str = "auto",
         preload_ocr: bool = False,
         verbose: bool = True,
+        cicadas_weights: str = "data/models/onfield/cicadas_best.pt",
+        visionbot_weights: str = "data/models/onfield/visionbot_best.pt",
     ) -> None:
         """
         Args:
             output_dir:  directory where <stem>_analysis.json files are written.
             frame_skip:  process every Nth frame (1 = every frame).
-            device:      PyTorch device for KataCR models.
+            device:      PyTorch device for detection models.
             preload_ocr: if True, initialise the EasyOCR reader at startup.
             verbose:     print progress to stdout.
+            cicadas_weights: path to Cicadas model weights (player cards).
+            visionbot_weights: path to Vision Bot model weights (opponent cards).
         """
         self.output_dir = Path(output_dir)
         self.frame_skip: int = frame_skip
         self.verbose: bool = verbose
 
-        self._katacr = KataCRDetector(device=device)
+        self._dual_detector = DualModelDetector(
+            cicadas_weights=cicadas_weights,
+            visionbot_weights=visionbot_weights,
+            device=device,
+        )
         self._ocr = DigitDetector(preload=preload_ocr)
         self._hand_tracker = HandTracker()
         self._hand_clf = HandClassifier()
@@ -97,12 +105,12 @@ class VideoAnalyzer:
             print(f"Effective FPS: {effective_fps:.1f}  Frames: ~{frames_to_process}")
             print("-" * 50)
 
-        # Calibrate KataCR from a mid-game frame (10% into the video)
+        # Calibrate detector from a mid-game frame (10% into the video)
         calib_idx = max(0, int(total_frames * 0.10))
         cap.set(cv2.CAP_PROP_POS_FRAMES, calib_idx)
         ret, calib_frame = cap.read()
         if ret:
-            self._katacr.calibrate(calib_frame)
+            self._dual_detector.calibrate(calib_frame)
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
         self._hand_tracker.reset()
@@ -132,8 +140,8 @@ class VideoAnalyzer:
                 elixir_result.value if elixir_result.detected else None
             )
 
-            # KataCR battlefield detection
-            field_result = self._katacr.detect(frame)
+            # Dual-model battlefield detection
+            field_result = self._dual_detector.detect(frame)
             on_field_dets: List[DetectionDict] = [
                 DetectionDict(
                     class_name=det.class_name,
@@ -147,7 +155,11 @@ class VideoAnalyzer:
             ]
 
             # Local hand classifier — identify the 4 hand slots
-            x_left, x_right = self._katacr._game_strip[:2] if self._katacr._game_strip else (None, None)  # type: ignore[index]
+            x_left, x_right = (
+                self._dual_detector._game_strip[:2]
+                if self._dual_detector._game_strip
+                else (None, None)
+            )
             game_strip = (x_left, x_right) if x_left is not None else None
             hand_dets: List[DetectionDict] = []
             try:
