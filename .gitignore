@@ -22,3 +22,6 @@ runs/
 # Temporary files
 *.tmp
 *.log
+
+# Claude Code project configuration
+.claude/
