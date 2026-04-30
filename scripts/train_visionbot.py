@@ -79,6 +79,8 @@ def main() -> None:
         device=device,
         project=str(_OUTPUT_DIR),
         name="visionbot",
+        save=True,
+        save_period=1,
         verbose=True,
     )
 
