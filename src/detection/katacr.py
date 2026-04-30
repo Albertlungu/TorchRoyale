@@ -47,6 +47,17 @@ from src.grid.coordinate_mapper import CoordinateMapper
 
 _WEIGHTS_DIR = Path(__file__).parents[2] / "data/models/onfield"
 
+# Motion-based ownership: snapshot every N processed frames.
+# Direction is determined purely from the tile_y component — if a unit's
+# tile_y increased between snapshots (moving toward the player's side at the
+# bottom of the screen), it belongs to the opponent, regardless of horizontal
+# movement. This also handles the case where a player tower is broken and the
+# opponent places units deep in the player's half.
+# Static units (tile_y unchanged) keep their spawn-position-based label.
+_MOTION_INTERVAL: int = 2       # processed frames between snapshots
+_MOTION_ZONE: Tuple[int, int] = (2, 29)   # full arena minus the king tower rows
+_MATCH_RADIUS: int = 4          # max tile distance to match same unit across frames
+
 # part2 crop params per aspect-ratio bucket (x, y, w, h as fractions of game strip)
 _PART2_PARAMS: Dict[Tuple[float, float], Tuple[float, float, float, float]] = {
     (2.13, 2.14): (0.026, 0.048, 0.960, 0.710),
@@ -59,6 +70,12 @@ _SUFFIX_RE = re.compile(
     r"-(in-hand|next|on-field|on_field|evolution-symbol|evolution|ability|bar|level)$",
     re.IGNORECASE,
 )
+
+# KataCR internal classes that are not real game units — filter them out
+_NOISE_CLASSES = frozenset({
+    "padding_belong", "bar", "bar-level", "clock", "elixir",
+    "emote", "evolution-symbol", "tower",
+})
 
 
 def _base(name: str) -> str:
@@ -87,6 +104,10 @@ class KataCRDetector:
         self._mapper: Optional[CoordinateMapper] = None
         self._game_strip: Optional[Tuple[int, int, int, int]] = None
         self._part2_params: Optional[Tuple[float, float, float, float]] = None
+
+        # Motion tracking state
+        self._prev_dets: List[Detection] = []
+        self._frame_count: int = 0
 
         if device == "auto":
             import torch  # pylint: disable=import-outside-toplevel
@@ -162,6 +183,8 @@ class KataCRDetector:
         # Mapper calibrated from the game strip dimensions
         self._mapper = CoordinateMapper()
         self._mapper.calibrate_from_image(game_w, game_h)
+        self._prev_dets = []
+        self._frame_count = 0
 
     def detect(self, frame: np.ndarray) -> FrameDetections:
         """
@@ -180,11 +203,78 @@ class KataCRDetector:
         part2, crop_x, crop_y = self._crop_part2(frame)
         raw = self._run_combo(part2)
         detections = self._parse(raw, part2.shape, crop_x, crop_y)
+        detections = self._apply_motion(detections)
+        self._frame_count += 1
+        if self._frame_count % _MOTION_INTERVAL == 0:
+            self._prev_dets = detections
         return FrameDetections(on_field=detections)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _apply_motion(self, detections: List[Detection]) -> List[Detection]:
+        """
+        Correct is_opponent using the tile_y component of movement direction.
+
+        Only the y-component of the movement vector matters — a unit moving
+        diagonally is still correctly classified as long as tile_y changed.
+        This covers units that crossed the river AND units placed in the
+        player's half after a tower break.
+
+          - tile_y increased (moving toward bottom / player side) → opponent
+          - tile_y decreased (moving toward top / opponent side) → player
+
+        Static units (tile_y unchanged between snapshots) and units outside
+        _MOTION_ZONE keep their spawn-position-based label from _parse().
+
+        Args:
+            detections: list from _parse() with initial is_opponent values.
+
+        Returns:
+            Same list with is_opponent corrected where motion is conclusive.
+        """
+        if not self._prev_dets:
+            return detections
+
+        zone_min, zone_max = _MOTION_ZONE
+        corrected: List[Detection] = []
+
+        for det in detections:
+            if not (zone_min <= det.tile_y <= zone_max):
+                corrected.append(det)
+                continue
+
+            # Find closest same-class unit in previous snapshot
+            best: Optional[Detection] = None
+            best_dist: int = _MATCH_RADIUS + 1
+            for prev in self._prev_dets:
+                if prev.class_name != det.class_name:
+                    continue
+                dist = abs(prev.tile_x - det.tile_x) + abs(prev.tile_y - det.tile_y)
+                if dist < best_dist:
+                    best_dist = dist
+                    best = prev
+
+            if best is None or best.tile_y == det.tile_y:
+                # No match or no vertical movement — keep existing label
+                corrected.append(det)
+                continue
+
+            # tile_y increased → moving down → coming from opponent side
+            # tile_y decreased → moving up → coming from player side
+            is_opponent = det.tile_y > best.tile_y
+            corrected.append(Detection(
+                class_name=det.class_name,
+                tile_x=det.tile_x,
+                tile_y=det.tile_y,
+                is_opponent=is_opponent,
+                is_on_field=det.is_on_field,
+                confidence=det.confidence,
+                bbox_px=det.bbox_px,
+            ))
+
+        return corrected
 
     def _crop_part2(self, frame: np.ndarray) -> Tuple[np.ndarray, int, int]:
         """
@@ -303,6 +393,9 @@ class KataCRDetector:
             names: Dict[int, str] = self._models[0].names  # type: ignore[index]
             raw_name = names.get(cls_idx, f"unit_{cls_idx}")
             card_name = _base(raw_name)
+
+            if card_name in _NOISE_CLASSES:
+                continue
 
             detections.append(
                 Detection(
