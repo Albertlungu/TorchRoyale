@@ -31,9 +31,9 @@ _SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Cards eligible for evolution tracking.
+# Cards eligible for evolution tracking (canonical dash-format names).
 # cannon is included for when evo cannon is added to the classifier dataset.
-_EVO_CANDIDATES: frozenset = frozenset({"ice spirit", "skeletons", "cannon", "musketeer"})
+_EVO_CANDIDATES: frozenset = frozenset({"ice-spirit", "skeleton", "cannon", "musketeer"})
 
 
 def _base(name: str) -> str:
@@ -66,6 +66,8 @@ class HandTracker:
         # None = unknown, True = has evo, False = no evo (stop tracking)
         self._evo_status: Dict[str, Optional[bool]] = {}
         self._cycle_count: Dict[str, int] = {}
+        self._hand_is_evo: Set[str] = set()   # cards in hand currently in evo state
+        self.last_played_evo: Set[str] = set()  # cards played as evo in last update
 
     def reset(self) -> None:
         """Clear all state. Call between games."""
@@ -73,6 +75,8 @@ class HandTracker:
         self._prev_field = set()
         self._evo_status = {}
         self._cycle_count = {}
+        self._hand_is_evo = set()
+        self.last_played_evo = set()
 
     def update(
         self,
@@ -114,7 +118,8 @@ class HandTracker:
         newly_on_field: Set[str] = {b for b, _, _ in (on_field_ids - self._prev_field)}
         played: Set[str] = {b for b in self._hand if b in newly_on_field}
 
-        # Increment cycle counter for every evo candidate that was just played
+        # Record which played cards were in evo state, then increment their cycle
+        self.last_played_evo = played & self._hand_is_evo
         for card in played:
             if card in _EVO_CANDIDATES and self._evo_status.get(card) is not False:
                 self._cycle_count[card] = self._cycle_count.get(card, 0) + 1
@@ -175,12 +180,14 @@ class HandTracker:
     def _build_output(self) -> List[str]:
         """Build the hand list, labelling evo cards at cycle==2 and resetting."""
         result: List[str] = []
+        self._hand_is_evo = set()
         for card in self._hand:
             if (
                 self._evo_status.get(card) is True
                 and self._cycle_count.get(card, 0) == 2
             ):
                 result.append(f"{card}-evolution-in-hand")
+                self._hand_is_evo.add(card)
                 self._cycle_count[card] = 0
             else:
                 result.append(f"{card}-in-hand")

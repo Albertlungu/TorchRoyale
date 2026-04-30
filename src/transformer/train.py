@@ -196,8 +196,12 @@ class Trainer:
             "config": self.cfg.__dict__,
         }, self.output_dir / name)
 
-    def train(self) -> None:
-        """Run the full training loop for cfg.max_epochs, saving checkpoints."""
+    def train(self, save_every: int = 25) -> None:
+        """Run the full training loop for cfg.max_epochs, saving checkpoints.
+
+        Args:
+            save_every: save a numbered checkpoint every this many epochs.
+        """
         train_loader = DataLoader(
             self.train_ds, batch_size=self.cfg.batch_size, shuffle=True, num_workers=0
         )
@@ -227,7 +231,7 @@ class Trainer:
                 best_val_loss = val_loss
                 self.save("best.pt")
 
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % save_every == 0:
                 self.save(f"epoch_{epoch+1}.pt")
 
             print(
@@ -255,16 +259,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", required=True)
     parser.add_argument("--output", default="data/models/dt")
-    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--epochs", type=int, default=600)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--context-len", type=int, default=None)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--save-every", type=int, default=25)
     args = parser.parse_args()
 
     cfg = DTConfig()
-    if args.epochs:
-        cfg.max_epochs = args.epochs
+    cfg.max_epochs = args.epochs
     if args.batch_size:
         cfg.batch_size = args.batch_size
     if args.lr:
@@ -273,7 +277,7 @@ def main() -> None:
         cfg.context_len = args.context_len
 
     trainer = Trainer(cfg, args.episodes, args.output, args.device)
-    trainer.train()
+    trainer.train(save_every=args.save_every)
 
 
 if __name__ == "__main__":

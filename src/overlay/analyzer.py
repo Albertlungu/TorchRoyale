@@ -4,9 +4,15 @@ analysis file with game state per frame.
 
 Detection pipeline:
   - KataCRDetector for battlefield (troops, buildings, spells, towers)
-  - Roboflow torchroyale/4 for hand cards (has -in-hand labels)
-  - HandTracker to stabilise hand state across frames
+  - HandClassifier for hand card identification (local YOLOv8 classifier)
+  - HandTracker to stabilise hand state and track evo cycles across frames
   - OCR for timer, elixir, and multiplier icon
+
+Post-processing rules applied per frame:
+  - If hero musketeer is in hand, any on-field "musketeer" is relabelled as
+    "hero musketeer" (KataCR cannot distinguish them).
+  - If an evo card was just played (HandTracker.last_played_evo), newly
+    appearing on-field units matching that card are labelled as evo.
 
 Public API:
   VideoAnalyzer -- construct once, call analyze_video() per replay file
@@ -17,10 +23,11 @@ import json
 import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import cv2
 
+from src.detection.hand_classifier import HandClassifier
 from src.detection.hand_tracker import HandTracker
 from src.detection.katacr import KataCRDetector
 from src.ocr.detector import DigitDetector
@@ -59,23 +66,7 @@ class VideoAnalyzer:
         self._katacr = KataCRDetector(device=device)
         self._ocr = DigitDetector(preload=preload_ocr)
         self._hand_tracker = HandTracker()
-        self._roboflow: Optional[Any] = None  # loaded lazily; False if unavailable
-
-    def _load_roboflow(self) -> None:
-        """Lazily load the Roboflow hand-detection model."""
-        if self._roboflow is not None:
-            return
-        try:
-            import os  # pylint: disable=import-outside-toplevel
-            from dotenv import load_dotenv  # type: ignore  # pylint: disable=import-outside-toplevel
-            from inference import get_model  # type: ignore  # pylint: disable=import-outside-toplevel
-            load_dotenv()
-            api_key = os.getenv("ROBOFLOW_API_KEY")
-            self._roboflow = get_model("torchroyale/4", api_key=api_key)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            if self.verbose:
-                print(f"[Roboflow] Not available: {exc} — hand detection via HandTracker only")
-            self._roboflow = False
+        self._hand_clf = HandClassifier()
 
     def analyze_video(self, video_path: str) -> Dict[str, Any]:
         """
@@ -114,7 +105,6 @@ class VideoAnalyzer:
             self._katacr.calibrate(calib_frame)
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-        self._load_roboflow()
         self._hand_tracker.reset()
 
         frames: List[FrameDict] = []
@@ -156,34 +146,50 @@ class VideoAnalyzer:
                 for det in field_result.on_field
             ]
 
-            # Roboflow hand detection (if available)
-            hand_dets: List[DetectionDict] = []
-            if self._roboflow:
-                try:
-                    rb_results = self._roboflow.infer(frame)
-                    preds = (
-                        rb_results[0].predictions
-                        if hasattr(rb_results[0], "predictions")
-                        else []
-                    )
-                    for pred in preds:
-                        name: str = getattr(pred, "class_name", "")
-                        if "-in-hand" in name.lower() or "-next" in name.lower():
-                            hand_dets.append(DetectionDict(
-                                class_name=name,
-                                tile_x=0,
-                                tile_y=31,
-                                is_opponent=False,
-                                is_on_field=False,
-                                confidence=float(getattr(pred, "confidence", 1.0)),
-                            ))
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
-
-            all_dets: List[DetectionDict] = on_field_dets + hand_dets
+            # Local hand classifier — identify the 4 hand slots
             x_left, x_right = self._katacr._game_strip[:2] if self._katacr._game_strip else (None, None)  # type: ignore[index]
             game_strip = (x_left, x_right) if x_left is not None else None
+            hand_dets: List[DetectionDict] = []
+            try:
+                classified = self._hand_clf.classify(frame, game_strip=game_strip)
+                for card_name in classified:
+                    if card_name:
+                        hand_dets.append(DetectionDict(
+                            class_name=f"{card_name}-in-hand",
+                            tile_x=0,
+                            tile_y=31,
+                            is_opponent=False,
+                            is_on_field=False,
+                            confidence=1.0,
+                        ))
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+            all_dets: List[DetectionDict] = on_field_dets + hand_dets
             tracked_hand: List[str] = self._hand_tracker.update(all_dets, frame=frame, game_strip=game_strip)
+
+            # Hero musketeer: KataCR cannot distinguish it from regular musketeer.
+            # If it is in the hand, every on-field musketeer this match is hero musketeer.
+            has_hero_musketeer = any("hero musketeer" in h for h in tracked_hand)
+            last_played_evo = self._hand_tracker.last_played_evo
+
+            final_field_dets: List[DetectionDict] = []
+            for det in on_field_dets:
+                name = det["class_name"]
+                if not det.get("is_opponent"):
+                    if name == "musketeer" and has_hero_musketeer:
+                        name = "hero musketeer"
+                    elif name in last_played_evo:
+                        name = f"{name}-evolution"
+                final_field_dets.append(DetectionDict(
+                    class_name=name,
+                    tile_x=det["tile_x"],
+                    tile_y=det["tile_y"],
+                    is_opponent=det["is_opponent"],
+                    is_on_field=det["is_on_field"],
+                    confidence=det["confidence"],
+                ))
+            all_dets = final_field_dets + hand_dets
 
             frames.append(FrameDict(
                 timestamp_ms=ts_ms,

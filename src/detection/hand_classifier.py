@@ -17,6 +17,29 @@ import numpy as np
 
 _WEIGHTS_PATH = Path(__file__).parents[2] / "data/models/hand_classifier/hand_classifier.pt"
 
+# Cards whose dataset folder names differ from the pipeline's canonical names.
+_NAME_ALIASES = {
+    "skeletons": "skeleton",  # dataset uses plural; KataCR and CARD_NAMES use singular
+}
+
+
+def _normalise(name: str) -> str:
+    """
+    Normalise a classifier output label to the pipeline's canonical format.
+
+    Rules applied in order:
+      1. "evo <card>" → "<card>-evolution"  (spaces converted to dashes)
+      2. Alias substitution (e.g. "skeletons" → "skeleton")
+      3. Spaces → dashes  (to match KataCR class names and CARD_NAMES vocab)
+    """
+    n = name.lower().strip()
+    if n.startswith("evo "):
+        base = n[4:]
+        base = _NAME_ALIASES.get(base, base).replace(" ", "-")
+        return f"{base}-evolution"
+    n = _NAME_ALIASES.get(n, n)
+    return n.replace(" ", "-")
+
 # Vertical crop of the hand area as fractions of frame height
 _Y_TOP_FRAC: float = 0.845
 _Y_BOT_FRAC: float = 0.965
@@ -106,7 +129,7 @@ class HandClassifier:
                 continue
             pred = self._model(crop, verbose=False)[0]
             conf = float(pred.probs.top1conf)
-            name = pred.names[pred.probs.top1] if conf >= _MIN_CONF else None
-            results.append(name)
+            raw = pred.names[pred.probs.top1] if conf >= _MIN_CONF else None
+            results.append(_normalise(raw) if raw is not None else None)
 
         return results
