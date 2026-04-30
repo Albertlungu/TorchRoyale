@@ -11,10 +11,13 @@ build/
 # Data — replays and models tracked via LFS or manually
 data/replays/
 data/models/dt/
+data/models/hand_classifier_dataset/
+data/hand_classifier_dataset/
 
 # Outputs — not tracked
 output/
 logs/
+runs/
 
 # Temporary files
 *.tmp
