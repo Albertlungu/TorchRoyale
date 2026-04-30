@@ -21,7 +21,16 @@ from ..constants.game_constants import get_tower_max_hp
 
 @dataclass
 class TowerHealthResult:
-    """Result of tower health detection."""
+    """Result of tower health detection.
+
+    Attributes:
+        hp_current (Optional[int]): Current HP, or None if not detected.
+        hp_max (int): Maximum HP for this tower.
+        health_percent (Optional[float]): Health percentage (0-100), or None.
+        detected (bool): Whether HP text was found.
+        is_destroyed (bool): Whether tower is destroyed.
+        raw_text (str): Raw OCR text.
+    """
     hp_current: Optional[int]  # None if not detected
     hp_max: int
     health_percent: Optional[float]  # 0-100, None if unknown (OCR failure on princess)
@@ -33,7 +42,13 @@ class TowerHealthResult:
 # Keep old class for backwards compatibility
 @dataclass
 class HealthBarResult:
-    """Result of health bar detection (legacy)."""
+    """Result of health bar detection (legacy).
+
+    Attributes:
+        health_percent (float): Health percentage (0-100).
+        bar_visible (bool): Whether health bar was detected.
+        confidence (float): Detection confidence.
+    """
     health_percent: float  # 0-100
     bar_visible: bool
     confidence: float
@@ -53,6 +68,10 @@ class TowerHealthDetector:
     Usage:
         detector = TowerHealthDetector()
         results = detector.detect_all_towers(image, tower_detections, level=15)
+
+    Attributes:
+        _backend (str): "easyocr" or "moondream".
+        _digit_detector: OCR detector instance (DigitDetector or VisionDetector).
     """
 
     def __init__(self, backend: str = "easyocr", device: str = "auto"):
@@ -472,7 +491,11 @@ class TowerHealthDetector:
 
 # Keep old class available for backwards compatibility
 class HealthBarDetector:
-    """Legacy health bar detector. Use TowerHealthDetector instead."""
+    """Legacy health bar detector. Use TowerHealthDetector instead.
+
+    Attributes:
+        (No instance attributes - legacy compatibility class.)
+    """
 
     def detect_health(self, image, region) -> HealthBarResult:
         return HealthBarResult(health_percent=100.0, bar_visible=False, confidence=0.0)

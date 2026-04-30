@@ -40,7 +40,14 @@ from src.video.video_processor import VideoInfo, VideoProcessor
 
 @dataclass
 class TowerHealth:
-    """Health status for a single tower."""
+    """Health status for a single tower.
+
+    Attributes:
+        hp_current (Optional[int]): Current HP, or None if unknown.
+        hp_max (int): Maximum HP for the tower.
+        health_percent (Optional[float]): Percentage of health (0-100), None if unknown.
+        is_destroyed (bool): Whether the tower has been destroyed.
+    """
 
     hp_current: Optional[int]
     hp_max: int
@@ -50,7 +57,21 @@ class TowerHealth:
 
 @dataclass
 class FrameState:
-    """Complete game state for a single frame."""
+    """Complete game state for a single frame.
+
+    Attributes:
+        timestamp_ms (int): Timestamp in milliseconds.
+        frame_number (int): Frame number in video.
+        game_phase (str): Current game phase name.
+        elixir_multiplier (int): Elixir multiplier (1, 2, or 3).
+        player_elixir (int): Player's current elixir.
+        opponent_elixir_estimated (float): Estimated opponent elixir.
+        game_time_remaining (Optional[int]): Seconds remaining in game, or None.
+        detections (List[Dict]): List of card/tower detections.
+        player_towers (Dict[str, Dict]): Player tower health data.
+        opponent_towers (Dict[str, Dict]): Opponent tower health data.
+        hand_cards (List[str]): Cards in player's hand.
+    """
 
     # Timing
     timestamp_ms: int
@@ -112,6 +133,26 @@ class VideoAnalyzer:
             save_annotated_frames=True,
             output_dir="output"
         )
+
+    Attributes:
+        frame_skip (int): Process every Nth frame.
+        save_frames (bool): Whether to save annotated frames.
+        frame_save_interval (int): Save every Nth processed frame.
+        output_dir (Path): Output directory for results.
+        verbose (bool): Print progress messages.
+        _video_processor (Optional[VideoProcessor]): Video processing component.
+        _detection_pipeline: Roboflow detection pipeline.
+        _digit_detector (Optional[DigitDetector]): OCR component.
+        _phase_tracker (Optional[GamePhaseTracker]): Game phase tracker.
+        _opponent_tracker (Optional[OpponentElixirTracker]): Opponent elixir tracker.
+        _player_tracker (Optional[PlayerElixirTracker]): Player elixir tracker.
+        _health_detector (Optional[TowerHealthDetector]): Tower health detector.
+        _ui_regions (Optional[UIRegions]): UI region definitions.
+        _outcome_detector (Optional[OutcomeDetector]): Game outcome detector.
+        _player_level (int): Detected player tower level.
+        _opponent_level (int): Detected opponent tower level.
+        _levels_detected (bool): Whether tower levels have been detected.
+        _last_tower_health (Dict[str, TowerHealthResult]): Last known tower health.
     """
 
     def __init__(

@@ -25,6 +25,13 @@ class InferenceRunner:
     """
     Runs VideoAnalyzer + DTStrategy on a replay video and writes a JSONL
     recommendation log that the overlay can read.
+
+    Attributes:
+        _video_path (str): Path to replay video file.
+        _checkpoint_path (str): Path to DT model checkpoint.
+        _output_jsonl (Path): Path to output JSONL recommendation log.
+        _analysis_output_dir (str): Directory for video analysis cache.
+        _frame_skip (int): Process every Nth frame.
     """
 
     def __init__(

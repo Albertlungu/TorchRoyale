@@ -46,8 +46,28 @@ class VideoPlayer:
     Args:
         video_path:  Path to the replay MP4.
         jsonl_path:  Path to the JSONL recommendation log.
-        wait_state:  "debug"      -- always show overlay regardless of elixir.
-                     "production" -- dim overlay when elixir is insufficient.
+    wait_state:  "debug"      -- always show overlay regardless of elixir.
+                 "production" -- dim overlay when elixir is insufficient.
+
+    Attributes:
+        _cap (cv2.VideoCapture): OpenCV video capture.
+        _fps (float): Video frames per second.
+        _total_frames (int): Total frames in video.
+        _vid_w (int): Video width.
+        _vid_h (int): Video height.
+        _scale (float): Display scaling factor.
+        _disp_w (int): Display width.
+        _disp_h (int): Display height.
+        _frame_delay_ms (int): Delay between frames in milliseconds.
+        _mapper (CoordinateMapper): Coordinate mapper.
+        _timestamps (List[int]): Timestamps from JSONL.
+        _all_entries (List[Dict]): All JSONL entries.
+        _rec_entries (List[Dict]): Entries with recommendations.
+        _rec_timestamps (List[int]): Timestamps with recommendations.
+        _playing (bool): Whether video is playing.
+        _overlay_visible (bool): Whether overlay is shown.
+        _last_printed_detections (Optional[str]): Last printed detection summary.
+        _wait_state (str): "debug" or "production".
     """
 
     def __init__(

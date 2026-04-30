@@ -17,7 +17,14 @@ from typing import List, Optional, Tuple
 
 @dataclass
 class UIRegion:
-    """Defines a rectangular UI region in pixel coordinates."""
+    """Defines a rectangular UI region in pixel coordinates.
+
+    Attributes:
+        x_min (int): Left pixel coordinate.
+        y_min (int): Top pixel coordinate.
+        x_max (int): Right pixel coordinate.
+        y_max (int): Bottom pixel coordinate.
+    """
 
     x_min: int
     y_min: int
@@ -60,6 +67,24 @@ class UIRegions:
     - 0-12%: Top UI (timer, player info, x2/x3 icons)
     - 12-80%: Arena (18x32 tile grid)
     - 80-100%: Bottom UI (card hand, elixir bar)
+
+    Attributes:
+        width (int): Screen width in pixels.
+        height (int): Screen height in pixels.
+        timer (UIRegion): Timer display region.
+        multiplier_icon (UIRegion): Elixir multiplier icon region.
+        elixir_bar (UIRegion): Elixir bar region.
+        elixir_number (UIRegion): Elixir number display region.
+        card_hand (UIRegion): Card hand region.
+        card_slots (List[UIRegion]): Individual card slot regions.
+        card_cost_regions (List[UIRegion]): Card cost display regions.
+        next_card (UIRegion): Next card slot region.
+        player_king_tower (UIRegion): Player king tower region.
+        player_left_tower (UIRegion): Player left princess tower region.
+        player_right_tower (UIRegion): Player right princess tower region.
+        opponent_king_tower (UIRegion): Opponent king tower region.
+        opponent_left_tower (UIRegion): Opponent left princess tower region.
+        opponent_right_tower (UIRegion): Opponent right princess tower region.
     """
 
     def __init__(self, screen_width: int = 1080, screen_height: int = 2400):

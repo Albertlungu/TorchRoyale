@@ -18,10 +18,26 @@ class GamePhase(Enum):
     SUDDEN_DEATH = "sudden_death"  # Overtime when tied
     GAME_OVER = "game_over"
 
+    Attributes:
+        SINGLE_ELIXIR (str): Normal elixir rate (3:00-2:00).
+        DOUBLE_ELIXIR (str): Double elixir (2:00-0:00).
+        TRIPLE_ELIXIR (str): Triple elixir (last min of overtime).
+        SUDDEN_DEATH (str): Overtime when tied.
+        GAME_OVER (str): Game has ended.
+    """
+
 
 @dataclass(frozen=True)
 class ElixirConstants:
-    """Elixir game mechanics constants."""
+    """Elixir game mechanics constants.
+
+    Attributes:
+        MAX_ELIXIR (int): Maximum elixir (10).
+        STARTING_ELIXIR (int): Starting elixir (5).
+        SINGLE_REGEN_RATE (float): Seconds per 1 elixir in single mode.
+        DOUBLE_REGEN_RATE (float): Seconds per 1 elixir in double mode.
+        TRIPLE_REGEN_RATE (float): Seconds per 1 elixir in triple mode.
+    """
     MAX_ELIXIR: int = 10
     STARTING_ELIXIR: int = 5
 
@@ -33,7 +49,14 @@ class ElixirConstants:
 
 @dataclass(frozen=True)
 class GameTimingConstants:
-    """Game timing constants in seconds."""
+    """Game timing constants in seconds.
+
+    Attributes:
+        TOTAL_GAME_TIME (int): Total game time (180 seconds).
+        DOUBLE_ELIXIR_START (int): Timer value triggering double elixir (60).
+        SUDDEN_DEATH_DURATION (int): Max overtime duration (180 seconds).
+        TRIPLE_ELIXIR_START (int): Overtime threshold for triple elixir (60).
+    """
     TOTAL_GAME_TIME: int = 180         # 3 minutes
     DOUBLE_ELIXIR_START: int = 60      # Last 1 minute triggers x2
     SUDDEN_DEATH_DURATION: int = 180   # 3 minutes overtime max

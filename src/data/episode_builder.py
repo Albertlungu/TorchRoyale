@@ -31,7 +31,16 @@ from src.transformer.config import DTConfig
 
 @dataclass
 class Timestep:
-    """A single card-placement event with state, action, and reward."""
+    """A single card-placement event with state, action, and reward.
+
+    Attributes:
+        state (Dict[str, Any]): Raw FrameState dictionary.
+        state_vec (np.ndarray): (97,) encoded feature vector.
+        action_card (int): Hand card index (0-3).
+        action_pos (int): Flattened tile position (0-575).
+        reward (float): Shaped reward for this timestep.
+        timestamp_ms (int): Timestamp in milliseconds.
+    """
 
     state: Dict[str, Any]  # Raw FrameState dict
     state_vec: np.ndarray  # (97,) encoded feature vector
@@ -43,7 +52,14 @@ class Timestep:
 
 @dataclass
 class Episode:
-    """A full game as a sequence of card-placement timesteps."""
+    """A full game as a sequence of card-placement timesteps.
+
+    Attributes:
+        timesteps (List[Timestep]): Sequence of timesteps.
+        outcome (GameOutcome): Game outcome (WIN/LOSS/UNKNOWN).
+        returns_to_go (Optional[np.ndarray]): (T,) return-to-go array.
+        video_path (str): Source video path.
+    """
 
     timesteps: List[Timestep] = field(default_factory=list)
     outcome: GameOutcome = GameOutcome.UNKNOWN

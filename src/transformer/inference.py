@@ -21,6 +21,24 @@ class DTInference:
 
     Maintains history of past (state, action, RTG) tuples and predicts
     the next action given the current state and target return.
+
+    Attributes:
+        config (DTConfig): Loaded model configuration.
+        rtg_mean (float): Mean return-to-go from training.
+        rtg_std (float): Std of return-to-go from training.
+        device (torch.device): Inference device.
+        model (DecisionTransformer): Loaded DT model.
+        target_return (float): Target return-to-go for conditioning.
+        temperature (float): Sampling temperature.
+        randomize_context_actions (bool): Whether to randomize context actions.
+        context_reset_interval (int): Steps before clearing history.
+        K (int): Context window length.
+        _states (List[np.ndarray]): History of state vectors.
+        _cards (List[int]): History of card actions.
+        _positions (List[int]): History of position actions.
+        _rtgs (List[float]): History of return-to-go values.
+        _current_rtg (float): Current return-to-go.
+        _steps_since_reset (int): Steps since last context reset.
     """
 
     def __init__(

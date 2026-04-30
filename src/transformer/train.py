@@ -22,7 +22,18 @@ from src.data.dt_dataset import load_dataset, DecisionTransformerDataset
 
 
 class DTTrainer:
-    """Handles the Decision Transformer training loop."""
+    """Handles the Decision Transformer training loop.
+
+    Attributes:
+        config (DTConfig): Training configuration.
+        model (DecisionTransformer): The DT model being trained.
+        dataset (DecisionTransformerDataset): Training dataset.
+        output_dir (Path): Directory for saving checkpoints.
+        device (torch.device): Training device (CPU/CUDA/MPS).
+        optimizer: AdamW optimizer.
+        card_loss_fn: CrossEntropyLoss for card prediction.
+        pos_loss_fn: CrossEntropyLoss for position prediction.
+    """
 
     def __init__(
         self,

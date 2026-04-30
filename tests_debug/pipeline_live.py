@@ -43,7 +43,33 @@ from src.recommendation.elixir_manager import OpponentElixirTracker
 
 
 class LivePipeline:
-    """Real-time optimized game state processing pipeline."""
+    """Real-time optimized game state processing pipeline.
+
+    Attributes:
+        target_fps (float): Target processing rate.
+        frame_time_budget (float): Max time per frame in seconds.
+        _detector: Lazy-loaded digit detector.
+        _regions: Lazy-loaded UI regions.
+        _phase_tracker: Lazy-loaded game phase tracker.
+        _opponent_tracker: Lazy-loaded opponent elixir tracker.
+        _health_detector: Lazy-loaded tower health detector.
+        _detection_pipeline: Lazy-loaded Roboflow pipeline.
+        frame_count (int): Number of frames processed.
+        start_time (float): Pipeline start time.
+        _last_ocr_frame (int): Last frame when OCR was run.
+        _ocr_cache (Dict): Cached OCR results.
+        _last_detection_frame (int): Last frame when detection ran.
+        _detection_cache (List): Cached detections.
+        _last_tower_frame (int): Last frame when tower health checked.
+        _tower_cache (Dict): Cached tower health.
+        ocr_interval (int): Frames between OCR operations.
+        detection_interval (int): Frames between detection operations.
+        tower_interval (int): Frames between tower health checks.
+        player_level (int): Detected player tower level.
+        opponent_level (int): Detected opponent tower level.
+        levels_detected (bool): Whether levels have been detected.
+        last_tower_hp (Dict): Last known tower health values.
+    """
 
     def __init__(self, target_fps: float = 30.0):
         """Initialize the live pipeline.

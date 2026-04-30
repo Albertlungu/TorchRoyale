@@ -35,7 +35,16 @@ from src.transformer.config import DTConfig
 
 @dataclass
 class FileConversionResult:
-    """Summary for one JSON input file conversion."""
+    """Summary for one JSON input file conversion.
+
+    Attributes:
+        source_path (Path): Source JSON file path.
+        source_format (str): "analysis" or "training".
+        training_pairs (int): Number of training pairs extracted.
+        episode_length (int): Number of timesteps in episode.
+        skipped (bool): Whether conversion was skipped.
+        skip_reason (str): Reason for skipping.
+    """
 
     source_path: Path
     source_format: str

@@ -288,6 +288,12 @@ class PlayerElixirTracker:
 
     Unlike opponent tracking, player elixir can be read directly
     from the UI, so this class mainly validates and smooths the readings.
+
+    Attributes:
+        current_elixir (int): Current player elixir value.
+        last_detected (int): Last raw detected elixir value.
+        detection_history (List[int]): Recent detection values for smoothing.
+        confidence (float): Confidence of current detection (0-1).
     """
 
     def __init__(self):

@@ -31,6 +31,12 @@ class VisionDetector:
         detector = VisionDetector()
         result = detector.detect_elixir(frame, (x1, y1, x2, y2))
         print(f"Elixir: {result.value}")
+
+    Attributes:
+        _model: Moondream2 model instance.
+        _tokenizer: Moondream2 tokenizer.
+        _device_str (str): Device string ("auto", "cuda", etc.).
+        _device (torch.device): Resolved device.
     """
 
     def __init__(self, device: str = "auto", preload: bool = False):

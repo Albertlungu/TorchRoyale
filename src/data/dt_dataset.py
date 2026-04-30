@@ -23,6 +23,15 @@ class DecisionTransformerDataset(Dataset):
 
     Each sample contains K consecutive timesteps with states, actions,
     returns-to-go, timestep indices, and attention masks.
+
+    Attributes:
+        episodes (List[Episode]): List of episode objects.
+        context_length (int): Number of timesteps per sample (K).
+        state_noise_std (float): State augmentation noise std.
+        rtg_noise_std (float): RTG augmentation noise std.
+        rtg_mean (float): Mean return-to-go across episodes.
+        rtg_std (float): Std of return-to-go across episodes.
+        samples (List[Tuple[int, int, int]]): Sampling index.
     """
 
     def __init__(

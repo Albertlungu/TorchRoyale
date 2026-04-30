@@ -26,6 +26,21 @@ class DecisionTransformer(nn.Module):
     Predicts actions from state token outputs using two heads:
         - Card head: which hand card to play (0-3)
         - Position head: where to place it (0-575, flattened 32x18 grid)
+
+    Attributes:
+        config (DTConfig): Model configuration.
+        embed_dim (int): Embedding dimension.
+        state_embed (nn.Sequential): State encoder.
+        rtg_embed (nn.Sequential): Return-to-go encoder.
+        action_card_embed (nn.Embedding): Card action embedding.
+        action_pos_embed (nn.Embedding): Position action embedding.
+        action_combine (nn.Linear): Combines card and position embeddings.
+        timestep_embed (nn.Embedding): Timestep positional embedding.
+        token_type_embed (nn.Embedding): Token type embedding (RTG/state/action).
+        embed_ln (nn.LayerNorm): Pre-transformer layer norm.
+        transformer (nn.TransformerDecoder): Transformer decoder.
+        card_head (nn.Sequential): Card prediction head.
+        pos_head (nn.Sequential): Position prediction head.
     """
 
     def __init__(self, config: DTConfig):

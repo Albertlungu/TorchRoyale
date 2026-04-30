@@ -19,7 +19,14 @@ from ..constants.game_constants import ELIXIR_COSTS, get_elixir_cost
 
 
 class CardType(Enum):
-    """Categories of cards with different placement rules."""
+    """Categories of cards with different placement rules.
+
+    Attributes:
+        TROOP (str): Troop cards.
+        BUILDING (str): Building cards.
+        SPELL (str): Spell cards.
+        LOG_SPELL (str): The Log (directional spell).
+    """
     TROOP = "troop"
     BUILDING = "building"
     SPELL = "spell"
@@ -66,6 +73,12 @@ class PlacementValidator:
     Generates numpy arrays (32x18) where:
     - 1 = valid placement
     - 0 = invalid placement
+
+    Attributes:
+        mapper (CoordinateMapper): Coordinate mapper instance.
+        width (int): Grid width from mapper.
+        height (int): Grid height from mapper.
+        _masks (Dict[CardType, np.ndarray]): Pre-computed placement masks.
     """
 
     def __init__(self, mapper: CoordinateMapper):

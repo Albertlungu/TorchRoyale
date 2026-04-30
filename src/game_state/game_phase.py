@@ -26,6 +26,12 @@ class GamePhaseTracker:
     - DOUBLE_ELIXIR -> SUDDEN_DEATH: Timer reaches 0:00 (if tied)
     - SUDDEN_DEATH -> TRIPLE_ELIXIR: Last 1:00 of overtime or x3 icon appears
     - TRIPLE_ELIXIR -> GAME_OVER: Overtime ends or tower destroyed
+
+    Attributes:
+        current_phase (GamePhase): Current game phase.
+        is_sudden_death (bool): Whether in sudden death overtime.
+        overtime_start_ms (Optional[int]): Timestamp when overtime started.
+        _last_timer_seconds (Optional[int]): Last detected timer value.
     """
 
     def __init__(self):

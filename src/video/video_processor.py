@@ -14,7 +14,16 @@ import numpy as np
 
 @dataclass
 class VideoInfo:
-    """Metadata about a video file."""
+    """Metadata about a video file.
+
+    Attributes:
+        path (str): Path to video file.
+        width (int): Video width in pixels.
+        height (int): Video height in pixels.
+        fps (float): Frames per second.
+        total_frames (int): Total number of frames.
+        duration_seconds (float): Video duration in seconds.
+    """
     path: str
     width: int
     height: int
@@ -51,6 +60,12 @@ class VideoProcessor:
             processor.open("game_recording.mp4")
             for frame, frame_num, timestamp_ms in processor.frames():
                 pass
+    """
+
+    Attributes:
+        frame_skip (int): Process every Nth frame.
+        _cap (Optional[cv2.VideoCapture]): OpenCV video capture object.
+        _video_info (Optional[VideoInfo]): Metadata about open video.
     """
 
     def __init__(self, frame_skip: int = 6):

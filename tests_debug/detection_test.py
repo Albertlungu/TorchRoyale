@@ -46,7 +46,20 @@ DEFAULT_TEST_DATA_DIR = Path("tests/data")
 
 @dataclass
 class Detection:
-    """Represents a single detected object with both pixel and tile coordinates."""
+    """Represents a single detected object with both pixel and tile coordinates.
+
+    Attributes:
+        class_name (str): Detected object class name.
+        confidence (float): Detection confidence.
+        pixel_x (int): Center x coordinate in pixels.
+        pixel_y (int): Center y coordinate in pixels.
+        pixel_width (int): Bounding box width in pixels.
+        pixel_height (int): Bounding box height in pixels.
+        tile_x (int): Mapped tile x coordinate (0-17).
+        tile_y (int): Mapped tile y coordinate (0-31).
+        is_opponent (bool): Whether object belongs to opponent.
+        is_on_field (bool): Whether object is on the field.
+    """
 
     class_name: str
     confidence: float
@@ -74,6 +87,12 @@ class Detection:
 class DetectionPipeline:
     """
     Complete detection pipeline from image to grid-mapped detections.
+
+    Attributes:
+        model: Roboflow model instance.
+        mapper (Optional[CoordinateMapper]): Coordinate mapper.
+        validator (Optional[PlacementValidator]): Placement validator.
+        _calibrated_size (Optional[Tuple[int, int]]): Last calibrated image size.
     """
 
     def __init__(self, model_id: str = ROBOFLOW_MODEL_ID):

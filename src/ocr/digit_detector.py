@@ -20,7 +20,14 @@ _ocr_reader = None
 
 @dataclass
 class DetectionResult:
-    """Result of a detection operation."""
+    """Result of a detection operation.
+
+    Attributes:
+        value (int): Detected numeric value.
+        confidence (float): OCR confidence (0.0-1.0).
+        detected (bool): Whether detection succeeded.
+        raw_text (str): Raw OCR text output.
+    """
     value: int
     confidence: float
     detected: bool
@@ -38,6 +45,9 @@ class DigitDetector:
         detector = DigitDetector()
         result = detector.detect_elixir(frame, (x1, y1, x2, y2))
         print(f"Elixir: {result.value}")
+
+    Attributes:
+        reader (EasyOCR Reader or None): OCR reader instance, lazily loaded.
     """
 
     def __init__(self, preload_ocr: bool = False):

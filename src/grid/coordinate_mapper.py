@@ -24,6 +24,14 @@ class ArenaBounds:
     - Arena origin: (27.6, 376.7)
     - Tile size: 62x50 px (width x height)
     - Arena: 18 tiles wide (1116 px), 32 tiles tall (1600 px)
+
+    Attributes:
+        x_min (int): Left pixel coordinate of arena.
+        y_min (int): Top pixel coordinate of arena.
+        x_max (int): Right pixel coordinate of arena.
+        y_max (int): Bottom pixel coordinate of arena.
+        image_width (int): Full image width for validation.
+        image_height (int): Full image height for validation.
     """
     # Top-left corner of the arena (pixel coordinates)
     x_min: int = 28
@@ -65,6 +73,15 @@ class CoordinateMapper:
     - Row 15: River (top)
     - Row 16: River (bottom) / Bridges at specific columns
     - Row 17-31: Your side
+
+    Attributes:
+        GRID_WIDTH (int): Number of tiles horizontally (18).
+        GRID_HEIGHT (int): Number of tiles vertically (32).
+        BRIDGE_TILES_X (list): X coordinates of bridge tiles.
+        RIVER_ROWS (list): Y coordinates of river rows.
+        bounds (ArenaBounds): Arena pixel boundaries.
+        tile_width (float): Width of each tile in pixels.
+        tile_height (float): Height of each tile in pixels.
     """
 
     GRID_WIDTH = 18   # tiles

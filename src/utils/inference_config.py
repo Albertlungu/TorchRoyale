@@ -13,7 +13,11 @@ DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent / "configs" / "inferen
 
 
 class InferenceConfig:
-    """Loads and manages inference configuration."""
+    """Loads and manages inference configuration.
+
+    Attributes:
+        _config (Dict): Loaded YAML configuration dictionary.
+    """
 
     def __init__(self, config_path: Optional[str] = None):
         """

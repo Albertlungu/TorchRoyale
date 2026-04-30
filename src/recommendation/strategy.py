@@ -38,6 +38,14 @@ class MLStrategy:
 
     Falls back to the most expensive affordable card at the center
     of the player's side if no models are loaded.
+
+    Attributes:
+        _model_dir (Path): Directory containing trained models.
+        _stage1: Stage 1 card prediction model (RandomForest).
+        _stage2: Stage 2 position prediction model (RandomForest).
+        _models_loaded (bool): Whether models are loaded.
+        _mapper (CoordinateMapper): Coordinate mapping utility.
+        _validator (PlacementValidator): Placement validation utility.
     """
 
     def __init__(self, model_dir: Optional[str] = None):
@@ -202,6 +210,17 @@ class DTStrategy:
     Uses a trained Decision Transformer that conditions on desired
     game outcomes to predict card placements. Maintains a rolling
     context window of recent game states and actions.
+
+    Attributes:
+        _config (InferenceConfig): Inference configuration.
+        _checkpoint_path (str): Path to model checkpoint.
+        _target_return (float): Target return-to-go.
+        _device (str): Inference device string.
+        _temperature (float): Sampling temperature.
+        _mapper (CoordinateMapper): Coordinate mapping utility.
+        _validator (PlacementValidator): Placement validation utility.
+        _inference (Optional[DTInference]): DT inference engine.
+        _models_loaded (bool): Whether model is loaded.
     """
 
     def __init__(
