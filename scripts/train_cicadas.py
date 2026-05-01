@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).parents[1]
-_CICADAS_DATASET = _PROJECT_ROOT / "data" / "datasets" / "cicadas"
+_CICADAS_DATASET = _PROJECT_ROOT / "data" / "datasets" / "cicadas_merged"
 _OUTPUT_DIR = _PROJECT_ROOT / "data" / "models" / "onfield"
 _BEST_WEIGHTS_NAME = "cicadas_best.pt"
 
@@ -78,7 +78,9 @@ def main() -> None:
         batch=16,
         device=device,
         project=str(_OUTPUT_DIR),
-        name="cicadas-v2",
+        name="cicadas-v3",
+        save=True,
+        save_period=1,
         verbose=True,
         # Heavy color augmentation to close the domain gap between
         # Roboflow (blue arena) and our videos (varied arena colors).
@@ -112,7 +114,7 @@ def main() -> None:
         print(f"Could not compute per-class AP: {e}")
 
     # Copy best.pt to canonical path
-    best_source = _OUTPUT_DIR / "cicadas-v2" / "weights" / "best.pt"
+    best_source = _OUTPUT_DIR / "cicadas-v3" / "weights" / "best.pt"
     best_dest = _OUTPUT_DIR / _BEST_WEIGHTS_NAME
 
     if best_source.exists():
