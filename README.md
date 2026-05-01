@@ -493,6 +493,35 @@ To update outcomes, edit the `GAME_OUTCOMES` dict in `src/data/game_outcomes.py`
 
 ---
 
+## Model Versions
+
+### Cicadas (Player Card Detector)
+
+| Version | Architecture | Training Data | Key Changes | File |
+|---------|--------------|---------------|-------------|------|
+| **v1** (original) | YOLOv8n | Roboflow Cicadas v1 | Baseline Hog 2.6 detection | `data/models/onfield/cicadas/weights/best.pt` |
+| **v2** | YOLOv8s | Roboflow Cicadas v1 | Upgraded to larger backbone; heavy HSV color augmentation (hsv_h=0.05, hsv_s=0.9, hsv_v=0.6) to handle varied arena colors; mAP@50 = 0.858 | `data/models/onfield/cicadas-v2-3/weights/best.pt` |
+
+**Why v2?**
+- v1 (yolov8n) struggled with low confidence on non-blue arenas (e.g., red backgrounds in your replays).
+- v2 uses yolov8s (larger model, 85M vs 5.9M) with aggressive HSV jitter during training to make it robust to background color variation.
+- Result: cards detected with higher confidence across varied arena colors.
+
+**How to use:**
+```python
+from src.detection.dual_model_detector import DualModelDetector
+# Use v2 by default (configured in dual_model_detector.py)
+detector = DualModelDetector()
+# Or explicitly load v1:
+detector = DualModelDetector(cicadas_weights="data/models/onfield/cicadas/weights/best.pt")
+```
+
+### Vision Bot (Opponent Card Detector)
+
+Trained on Roboflow's "vision-bot/clash-royale-all-enemy-cards" dataset covering all cards in the game. Uses yolov8s with the same color augmentation as Cicadas v2.
+
+---
+
 ## Known Limitations
 
 ### Model Coverage
