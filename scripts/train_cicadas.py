@@ -87,6 +87,7 @@ def main() -> None:
         hsv_h=0.05,
         hsv_s=0.9,
         hsv_v=0.6,
+        workers=8,
     )
 
     # Print metrics
