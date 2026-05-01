@@ -79,7 +79,7 @@ def main() -> None:
         batch=batch,
         device=device,
         project=str(_OUTPUT_DIR),
-        name="visionbot",
+        name="visionbot-v2",
         save=True,
         save_period=2,
         verbose=True,
@@ -114,7 +114,7 @@ def main() -> None:
         print(f"Could not compute per-class AP: {e}")
 
     # Copy best.pt to canonical path
-    best_source = _OUTPUT_DIR / "visionbot" / "weights" / "best.pt"
+    best_source = _OUTPUT_DIR / "visionbot-v2" / "weights" / "best.pt"
     best_dest = _OUTPUT_DIR / _BEST_WEIGHTS_NAME
 
     if best_source.exists():
