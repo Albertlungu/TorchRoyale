@@ -75,7 +75,7 @@ def main() -> None:
         data=str(data_yaml),
         epochs=100,
         imgsz=640,
-        batch=16,
+        batch=32,
         device=device,
         project=str(_OUTPUT_DIR),
         name="cicadas-v3",
@@ -87,7 +87,6 @@ def main() -> None:
         hsv_h=0.05,
         hsv_s=0.9,
         hsv_v=0.6,
-        workers=8,
     )
 
     # Print metrics
