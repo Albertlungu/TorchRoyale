@@ -1,7 +1,7 @@
 """
-Train YOLOv8n on the Vision Bot all-enemy-cards dataset for opponent cards detection.
+Train YOLOv8s on the Vision Bot all-enemy-cards dataset for opponent cards detection.
 
-Trains a YOLOv8n model on the Vision Bot dataset (opponent's cards on the field)
+Trains a YOLOv8s model on the Vision Bot dataset (opponent's cards on the field)
 and saves the best weights to data/models/onfield/visionbot_best.pt.
 
 Usage:
@@ -42,7 +42,7 @@ def _detect_device() -> str:
 def main() -> None:
     """Train YOLOv8n on the Vision Bot all-enemy-cards dataset."""
     print("=" * 60)
-    print("Vision Bot YOLOv8n Training (All Enemy Cards)")
+    print("Vision Bot YOLOv8s Training (All Enemy Cards)")
     print("=" * 60)
 
     # Verify dataset exists
@@ -67,8 +67,8 @@ def main() -> None:
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Load and train
-    print("Loading YOLOv8n pre-trained weights...")
-    model = YOLO("yolov8n.pt")
+    print("Loading YOLOv8s pre-trained weights...")
+    model = YOLO("yolov8s.pt")
 
     print(f"Starting training on {data_yaml}...")
     results = model.train(
@@ -82,6 +82,11 @@ def main() -> None:
         save=True,
         save_period=1,
         verbose=True,
+        # Heavy color augmentation to close the domain gap between
+        # Roboflow (blue arena) and our videos (varied arena colors).
+        hsv_h=0.05,
+        hsv_s=0.9,
+        hsv_v=0.6,
     )
 
     # Print metrics
