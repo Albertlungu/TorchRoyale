@@ -55,6 +55,7 @@ def main() -> None:
     # Detect device
     device = _detect_device()
     print(f"Using device: {device}")
+    batch = 32 if device == "cuda" else 16
 
     # Import YOLO
     try:
@@ -73,14 +74,14 @@ def main() -> None:
     print(f"Starting training on {data_yaml}...")
     results = model.train(
         data=str(data_yaml),
-        epochs=100,
+        epochs=200,
         imgsz=640,
-        batch=32,
+        batch=batch,
         device=device,
         project=str(_OUTPUT_DIR),
         name="visionbot",
         save=True,
-        save_period=1,
+        save_period=2,
         verbose=True,
         # Heavy color augmentation to close the domain gap between
         # Roboflow (blue arena) and our videos (varied arena colors).
