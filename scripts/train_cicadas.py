@@ -78,7 +78,7 @@ def main() -> None:
         batch=16,
         device=device,
         project=str(_OUTPUT_DIR),
-        name="cicadas",
+        name="cicadas-v2",
         verbose=True,
         # Heavy color augmentation to close the domain gap between
         # Roboflow (blue arena) and our videos (varied arena colors).
@@ -112,7 +112,7 @@ def main() -> None:
         print(f"Could not compute per-class AP: {e}")
 
     # Copy best.pt to canonical path
-    best_source = _OUTPUT_DIR / "cicadas" / "weights" / "best.pt"
+    best_source = _OUTPUT_DIR / "cicadas-v2" / "weights" / "best.pt"
     best_dest = _OUTPUT_DIR / _BEST_WEIGHTS_NAME
 
     if best_source.exists():
