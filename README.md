@@ -497,23 +497,22 @@ To update outcomes, edit the `GAME_OUTCOMES` dict in `src/data/game_outcomes.py`
 
 ### Cicadas (Player Card Detector)
 
-| Version | Architecture | Training Data | Key Changes | File |
-|---------|--------------|---------------|-------------|------|
-| **v1** (original) | YOLOv8n | Roboflow Cicadas v1 | Baseline Hog 2.6 detection | `data/models/onfield/cicadas/weights/best.pt` |
-| **v2** | YOLOv8s | Roboflow Cicadas v1 | Upgraded to larger backbone; heavy HSV color augmentation (hsv_h=0.05, hsv_s=0.9, hsv_v=0.6) to handle varied arena colors; mAP@50 = 0.858 | `data/models/onfield/cicadas-v2-3/weights/best.pt` |
+**Current Version: YOLOv8s with Color Augmentation**
+- Architecture: YOLOv8s (85M parameters)
+- Training Data: Roboflow Cicadas dataset (Hog 2.6 deck cards)
+- Key Features:
+  - Heavy HSV color augmentation (hsv_h=0.05, hsv_s=0.9, hsv_v=0.6) to handle varied arena colors
+  - Robust to non-blue backgrounds (red arenas, different lighting, etc.)
+  - mAP@50 = 0.858 on validation set
+- Weights: `data/models/onfield/cicadas_best.pt`
 
-**Why v2?**
-- v1 (yolov8n) struggled with low confidence on non-blue arenas (e.g., red backgrounds in your replays).
-- v2 uses yolov8s (larger model, 85M vs 5.9M) with aggressive HSV jitter during training to make it robust to background color variation.
-- Result: cards detected with higher confidence across varied arena colors.
+**Why this approach?**
+Earlier yolov8n models struggled with low confidence on non-blue arenas. The current v2 uses a larger backbone (yolov8s) and aggressive color jittering during training to make the model invariant to background color variation. This allows it to detect cards with high confidence regardless of arena appearance.
 
-**How to use:**
+**Usage:**
 ```python
 from src.detection.dual_model_detector import DualModelDetector
-# Use v2 by default (configured in dual_model_detector.py)
-detector = DualModelDetector()
-# Or explicitly load v1:
-detector = DualModelDetector(cicadas_weights="data/models/onfield/cicadas/weights/best.pt")
+detector = DualModelDetector()  # loads cicadas_best.pt by default
 ```
 
 ### Vision Bot (Opponent Card Detector)
