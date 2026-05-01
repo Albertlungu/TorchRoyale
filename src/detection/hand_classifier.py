@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import numpy as np
+from ultralytics import YOLO
 
 _WEIGHTS_PATH = (
     Path(__file__).parents[2] / "data/models/hand_classifier/hand_classifier.pt"
@@ -113,7 +114,6 @@ class HandClassifier:
                 f"Hand classifier weights not found: {self._weights}\n"
                 "Run: python scripts/train_hand_classifier.py"
             )
-        from ultralytics import YOLO  # pylint: disable=import-outside-toplevel
 
         self._model = YOLO(str(self._weights))
 

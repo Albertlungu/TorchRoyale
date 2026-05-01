@@ -1,16 +1,17 @@
 """
-Comprehensive test for the full detection pipeline.
+Full pipeline test: cicadas, visionbot, and hand classifier.
 
-Runs detection every 120 frames starting at frame 1000 on a specified video.
-Outputs annotated frames showing:
-  1. Player cards (green boxes - from Cicadas model)
-  2. Opponent cards (red boxes - from Vision Bot model)
-  3. OCR regions with detected values (timer, elixir, multiplier)
-  4. Hand cards with evo status
+Runs detection every --stride frames starting at --start on a specified video.
+Saves annotated frames to output/test_frames/ with:
+  - Green boxes: player cards (Cicadas model)
+  - Red boxes:   opponent cards (Vision Bot model)
+  - Blue boxes:  hand card slots (Hand Classifier)
 
 Usage:
+  python tests/test_full_pipeline.py data/replays/Game_23.mp4
   python tests/test_full_pipeline.py data/replays/Game_23.mp4 --start 1000 --stride 120
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,291 +22,187 @@ from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 
-# Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from src.detection.dual_model_detector import DualModelDetector
-from src.detection.hand_classifier import HandClassifier
-from src.detection.hand_tracker import HandTracker
-from src.ocr.detector import DigitDetector, OCRResult
-from src.ocr.regions import UIRegions
-from src.types import DetectionDict
+from src.detection.hand_classifier import HandClassifier, get_next_bbox
+from src.detection.result import Detection
+
+_OUTPUT_DIR = Path("output/test_frames")
+
+# Bbox colours (BGR)
+_CICADAS_COLOUR = (0, 200, 0)  # green: player cards
+_VISIONBOT_COLOUR = (0, 0, 220)  # red: opponent cards
+_HAND_COLOUR = (200, 140, 0)  # blue: hand slots
 
 
-def draw_onfield_detections(frame: np.ndarray, detections: list, mapper) -> np.ndarray:
-    """
-    Draw on-field detections with color-coded bounding boxes.
-
-    Args:
-        frame: BGR image array.
-        detections: list of Detection objects.
-        mapper: CoordinateMapper for tile grid overlay.
-
-    Returns:
-        Annotated frame.
-    """
-    result = frame.copy()
-
-    for det in detections:
-        x1, y1, x2, y2 = det.bbox_px
-        # Green=player, Red=opponent
-        color = (0, 255, 0) if not det.is_opponent else (0, 0, 255)
-        thickness = 2
-
-        cv2.rectangle(result, (x1, y1), (x2, y2), color, thickness)
-
-        # Label with class name, confidence, and tile coords
-        label = f"{det.class_name} {det.confidence:.2f} ({det.tile_x},{det.tile_y})"
-        cv2.putText(result, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-    return result
-
-
-def draw_hand_cards(
-    frame: np.ndarray, hand: list, game_strip: Optional[Tuple[int, int]]
+def _draw_detections(
+    frame: np.ndarray,
+    on_field: List[Detection],
+    hand_labels: List[Optional[str]],
+    game_strip: Optional[Tuple[int, int]],
 ) -> np.ndarray:
-    """
-    Draw hand card slots with card names and evo status.
+    out = frame.copy()
+    frame_h, frame_w = out.shape[:2]
 
-    Args:
-        frame: BGR image array.
-        hand: List of card name strings from HandTracker.
-        game_strip: (x_left, x_right) pixel bounds.
-
-    Returns:
-        Annotated frame.
-    """
-    result = frame.copy()
-    frame_h, frame_w = frame.shape[:2]
-
-    # Hand area position (from hand_classifier.py)
-    y_top = int(frame_h * 0.845)
-    y_bot = int(frame_h * 0.965)
-
-    if game_strip is None:
-        x_left = 0
-        x_right = frame_w
-    else:
-        x_left, x_right = game_strip
-
-    next_end = x_left + int((x_right - x_left) * 0.115)
-    cards_w = x_right - next_end
-    slot_w = cards_w // 4
-
-    for i, card in enumerate(hand):
-        if card is None:
+    # On-field detections
+    for det in on_field:
+        if not det.bbox_px:
             continue
-
-        x1 = next_end + i * slot_w
-        x2 = x1 + slot_w
-
-        # Determine color based on evo status
-        if "evolution" in card:
-            color = (255, 165, 0)  # Orange for evo
-        else:
-            color = (255, 255, 0)  # Cyan for normal
-
-        # Draw slot rectangle
-        cv2.rectangle(result, (x1, y_top), (x2, y_bot), color, 2)
-
-        # Clean up card name for display
-        display_name = card.replace("-in-hand", "").replace("-evolution", "").replace("-", " ")
-        if "evolution" in card:
-            display_name += " [EVO]"
-
+        x1, y1, x2, y2 = det.bbox_px
+        colour = _VISIONBOT_COLOUR if det.is_opponent else _CICADAS_COLOUR
+        cv2.rectangle(out, (x1, y1), (x2, y2), colour, 2)
+        label = f"{det.class_name} {det.confidence:.2f}"
         cv2.putText(
-            result, display_name, (x1 + 5, y_top - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+            out,
+            label,
+            (x1, max(y1 - 6, 12)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            colour,
+            1,
+            cv2.LINE_AA,
         )
 
-    return result
+    # Hand slots
+    if game_strip is not None:
+        x_left, x_right = game_strip
+        game_w = x_right - x_left
+        from src.detection.hand_classifier import (
+            _INSET_FRAC,
+            _NEXT_LEFT_FRAC,
+            _NEXT_RIGHT_FRAC,
+            _SLOT_OFFSET_FRACS,
+            _Y_BOT_FRAC,
+            _Y_TOP_FRAC,
+        )
+
+        next_end = x_left + int(game_w * _NEXT_RIGHT_FRAC)
+        y_top = int(frame_h * _Y_TOP_FRAC)
+        y_bot = int(frame_h * _Y_BOT_FRAC)
+        cards_w = x_right - next_end
+        slot_w = cards_w // 4
+        inset = int(slot_w * _INSET_FRAC)
+
+        for i, (label, offset_frac) in enumerate(zip(hand_labels, _SLOT_OFFSET_FRACS)):
+            offset = int(slot_w * offset_frac)
+            sx1 = next_end + i * slot_w + inset + offset
+            sx2 = sx1 + slot_w - 2 * inset
+            sx1 = max(0, sx1)
+            sx2 = min(frame_w, sx2)
+            cv2.rectangle(out, (sx1, y_top), (sx2, y_bot), _HAND_COLOUR, 2)
+            if label:
+                cv2.putText(
+                    out,
+                    label,
+                    (sx1, y_top - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    _HAND_COLOUR,
+                    1,
+                    cv2.LINE_AA,
+                )
+
+        # Next-card box
+        nx1, ny1, nx2, ny2 = get_next_bbox(frame_h, frame_w, x_left, x_right)
+        cv2.rectangle(out, (nx1, ny1), (nx2, ny2), _HAND_COLOUR, 1)
+
+    return out
 
 
-def draw_ocr_regions(
-    frame: np.ndarray,
-    ui_regions: UIRegions,
-    timer_secs: Optional[int],
-    elixir: Optional[int],
-    multiplier: int,
-) -> np.ndarray:
-    """
-    Draw OCR regions with detected values.
+def _detect_game_strip(frame: np.ndarray) -> Optional[Tuple[int, int]]:
+    gray = np.mean(frame, axis=2) if frame.ndim == 3 else frame
+    cols = np.where(np.mean(gray, axis=0) > 30)[0]
+    if cols.size == 0:
+        return None
+    return int(cols.min()), int(cols.max())
 
-    Args:
-        frame: BGR image array.
-        ui_regions: UIRegions object with timer, elixir, multiplier regions.
-        timer_secs: Detected timer value in seconds.
-        elixir: Detected elixir count.
-        multiplier: Detected multiplier (1, 2, or 3).
 
-    Returns:
-        Annotated frame.
-    """
-    result = frame.copy()
-
-    # Timer region (blue)
-    t = ui_regions.timer
-    cv2.rectangle(result, (t.x_min, t.y_min), (t.x_max, t.y_max), (255, 0, 0), 2)
-    timer_str = f"Timer: {timer_secs}s" if timer_secs is not None else "Timer: N/A"
-    cv2.putText(
-        result, timer_str, (t.x_min, t.y_min - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Full pipeline smoke test.")
+    parser.add_argument("video", help="Path to input video file.")
+    parser.add_argument("--start", type=int, default=0, help="First frame to test.")
+    parser.add_argument(
+        "--stride", type=int, default=120, help="Frame stride between samples."
     )
-
-    # Elixir region (yellow)
-    e = ui_regions.elixir_number
-    cv2.rectangle(result, (e.x_min, e.y_min), (e.x_max, e.y_max), (0, 255, 255), 2)
-    elixir_str = f"Elixir: {elixir}" if elixir is not None else "Elixir: N/A"
-    cv2.putText(
-        result, elixir_str, (e.x_min, e.y_min - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2
+    parser.add_argument(
+        "--count", type=int, default=20, help="Number of frames to process."
     )
-
-    # Multiplier region (purple)
-    m = ui_regions.multiplier_icon
-    cv2.rectangle(result, (m.x_min, m.y_min), (m.x_max, m.y_max), (255, 0, 255), 2)
-    cv2.putText(
-        result,
-        f"Mult: {multiplier}x",
-        (m.x_min, m.y_min - 5),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.6,
-        (255, 0, 255),
-        2,
+    parser.add_argument(
+        "--conf",
+        type=float,
+        default=0.45,
+        help="Confidence threshold for on-field detections (default 0.1).",
     )
-
-    return result
+    return parser.parse_args()
 
 
 def main() -> None:
-    """Run the full pipeline test."""
-    parser = argparse.ArgumentParser(description="Test full detection pipeline with visualization")
-    parser.add_argument("video", help="Path to the replay video file")
-    parser.add_argument("--start", type=int, default=1000, help="Start frame (default: 1000)")
-    parser.add_argument("--stride", type=int, default=120, help="Frame stride (default: 120)")
-    parser.add_argument("--count", type=int, default=20, help="Number of frames to process (default: 20)")
-    parser.add_argument("--output-dir", default="output/test_frames", help="Output directory for frames")
-    parser.add_argument("--device", default="auto", help="PyTorch device (default: auto)")
-    args = parser.parse_args()
-
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Initialize detectors
-    print("Initializing detectors...")
-    dual_detector = DualModelDetector(device=args.device)
-    hand_clf = HandClassifier()
-    ocr = DigitDetector()
-    hand_tracker = HandTracker()
-
-    # Open video
-    cap = cv2.VideoCapture(args.video)
-    if not cap.isOpened():
-        print(f"Error: Could not open video {args.video}")
+    args = _parse_args()
+    video_path = Path(args.video)
+    if not video_path.exists():
+        print(f"Error: video not found: {video_path}")
         sys.exit(1)
 
+    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("Initializing detectors...")
+    detector = DualModelDetector(conf_threshold=args.conf)
+    hand_clf = HandClassifier()
+
+    cap = cv2.VideoCapture(str(video_path))
     fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     vid_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vid_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"Video: {vid_w}x{vid_h} @ {fps}fps, {total} frames")
 
-    print(f"Video: {vid_w}x{vid_h} @ {fps}fps, {total_frames} frames")
+    # Seek to start frame and calibrate
+    cap.set(cv2.CAP_PROP_POS_FRAMES, args.start)
+    ok, cal_frame = cap.read()
+    if not ok:
+        print(f"Error: could not read frame {args.start}")
+        sys.exit(1)
 
-    # Calibrate from start frame
     print(f"Calibrating from frame {args.start}...")
-    cap.set(cv2.CAP_PROP_POS_FRAMES, args.start)
-    ret, calib_frame = cap.read()
-    if ret:
-        dual_detector.calibrate(calib_frame)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, args.start)
+    detector.calibrate(cal_frame)
 
-    hand_tracker.reset()
-
-    # Process frames
-    frame_num = args.start
     saved = 0
+    frame_idx = args.start
 
     while saved < args.count:
-        # Skip frames
-        for _ in range(args.stride - 1):
-            cap.grab()
-
-        ret, frame = cap.read()
-        if not ret:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ok, frame = cap.read()
+        if not ok:
             break
 
-        # Rebuild UI regions per frame
-        ui_regions = UIRegions(vid_w, vid_h)
-        ui_regions.align_timer(frame)
-        ui_regions.align_elixir(frame)
-        ui_regions.align_multiplier(frame)
+        game_strip = _detect_game_strip(frame)
+        gs_tuple = game_strip  # (x_left, x_right) or None
 
-        # OCR detection
-        timer_secs = ocr.detect_timer(frame, ui_regions.timer.to_tuple())
-        elixir_result = ocr.detect_elixir(frame, ui_regions.elixir_number.to_tuple())
-        multiplier = ocr.detect_multiplier(frame, ui_regions.multiplier_icon.to_tuple())
-        player_elixir = elixir_result.value if elixir_result.detected else None
+        field_result = detector.detect(frame)
+        hand_labels = hand_clf.classify(frame, game_strip=gs_tuple)
 
-        # On-field detection
-        field_result = dual_detector.detect(frame)
-
-        # Hand detection
-        x_left, x_right = (
-            dual_detector._game_strip[:2] if dual_detector._game_strip else (None, None)
-        )
-        game_strip = (x_left, x_right) if x_left is not None else None
-
-        classified = hand_clf.classify(frame, game_strip=game_strip)
-
-        # Update hand tracker
-        on_field_dets: List[DetectionDict] = [
-            DetectionDict(
-                class_name=det.class_name,
-                tile_x=det.tile_x,
-                tile_y=det.tile_y,
-                is_opponent=det.is_opponent,
-                is_on_field=True,
-                confidence=det.confidence,
-            )
-            for det in field_result.on_field
-        ]
-
-        hand_dets: List[DetectionDict] = []
-        for card_name in classified:
-            if card_name:
-                hand_dets.append(
-                    DetectionDict(
-                        class_name=f"{card_name}-in-hand",
-                        tile_x=0,
-                        tile_y=31,
-                        is_opponent=False,
-                        is_on_field=False,
-                        confidence=1.0,
-                    )
-                )
-
-        all_dets = on_field_dets + hand_dets
-        tracked_hand = hand_tracker.update(all_dets, frame=frame, game_strip=game_strip)
-
-        # Draw annotations
-        annotated = frame.copy()
-        annotated = draw_onfield_detections(annotated, field_result.on_field, dual_detector._mapper)
-        annotated = draw_hand_cards(annotated, tracked_hand, game_strip)
-        annotated = draw_ocr_regions(annotated, ui_regions, timer_secs, player_elixir, multiplier)
-
-        # Add frame info
-        info_text = f"Frame: {frame_num} | Timer: {timer_secs}s | Elixir: {player_elixir} | Mult: {multiplier}x"
-        cv2.putText(
-            annotated, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
+        annotated = _draw_detections(
+            frame, field_result.on_field, hand_labels, gs_tuple
         )
 
-        # Save frame
-        output_path = output_dir / f"frame_{frame_num}.jpg"
-        cv2.imwrite(str(output_path), annotated)
-        print(f"Saved: {output_path} ({len(field_result.on_field)} on-field detections)")
+        out_path = _OUTPUT_DIR / f"frame_{frame_idx}.jpg"
+        cv2.imwrite(str(out_path), annotated)
 
-        frame_num += args.stride
+        player_dets = sum(1 for d in field_result.on_field if not d.is_opponent)
+        opp_dets = sum(1 for d in field_result.on_field if d.is_opponent)
+        hand_str = ", ".join(l or "?" for l in hand_labels)
+        print(
+            f"Saved: {out_path}  "
+            f"({player_dets} player, {opp_dets} opponent on-field)  "
+            f"hand=[{hand_str}]"
+        )
+
         saved += 1
+        frame_idx += args.stride
 
     cap.release()
-    print(f"\nDone! Saved {saved} frames to {output_dir}")
+    print(f"\nDone! Saved {saved} frames to {_OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
