@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
         self.is_running = False
 
         self.setWindowTitle("TorchRoyale")
-        self.setGeometry(100, 100, 900, 600)
+        self.setGeometry(100, 100, 1280, 820)
 
         main_widget = QWidget(self)
         self.setCentralWidget(main_widget)
@@ -69,6 +69,8 @@ class MainWindow(QMainWindow):
             "Live bot backend is not configured for TorchRoyale yet. "
             "UI controls are disabled."
         )
+        if hasattr(self, "dashboard_status_value"):
+            self.dashboard_status_value.setText("UI only")
 
     def log_handler_function(self, message: str) -> None:
         self.log_message.emit(message)
@@ -91,9 +93,9 @@ class MainWindow(QMainWindow):
             return
         pause_event = getattr(self.bot, "pause_event", None)
         if pause_event is not None and pause_event.is_set():
-            self.play_pause_button.setText("▶")
+            self.play_pause_button.setText("Resume")
         else:
-            self.play_pause_button.setText("⏸")
+            self.play_pause_button.setText("Pause")
         self.bot.pause_or_resume()
 
     def start_bot(self) -> None:
@@ -106,17 +108,22 @@ class MainWindow(QMainWindow):
         self.is_running = True
         self.bot_thread = Thread(target=self.bot_task, daemon=True)
         self.bot_thread.start()
-        self.start_stop_button.setText("■")
+        self.start_stop_button.setText("Stop")
         self.play_pause_button.show()
         self.server_id_label.setText("Status: Running")
+        if hasattr(self, "dashboard_status_value"):
+            self.dashboard_status_value.setText("Running")
 
     def stop_bot(self) -> None:
         if self.bot and hasattr(self.bot, "stop"):
             self.bot.stop()
         self.is_running = False
-        self.start_stop_button.setText("▶")
+        self.start_stop_button.setText("Start")
+        self.play_pause_button.setText("Pause")
         self.play_pause_button.hide()
         self.server_id_label.setText("Status: Stopped")
+        if hasattr(self, "dashboard_status_value"):
+            self.dashboard_status_value.setText("Stopped")
 
     def restart_bot(self) -> None:
         if self.is_running:
@@ -134,6 +141,10 @@ class MainWindow(QMainWindow):
         self.config["visuals"]["save_images"] = self.save_images_checkbox.isChecked()
         self.config["visuals"]["show_images"] = self.show_images_checkbox.isChecked()
         self.visualize_tab.update_active_state(self.config["visuals"]["show_images"])
+        if hasattr(self, "dashboard_visualizer_value"):
+            self.dashboard_visualizer_value.setText(
+                "On" if self.config["visuals"]["show_images"] else "Off"
+            )
         self.config["bot"]["load_deck"] = self.load_deck_checkbox.isChecked()
         self.config["bot"]["auto_start_game"] = (
             self.auto_start_game_checkbox.isChecked()

@@ -11,6 +11,7 @@ from src.ui.utils import load_config
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     window = MainWindow(load_config(), bot_factory=create_torchroyale_bot)
     window.show()
     return app.exec()
