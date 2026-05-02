@@ -38,30 +38,34 @@ from src.detection.result import Detection
 from src.game_state.phase import derive_phases
 from src.ocr.detector import DigitDetector
 from src.ocr.regions import UIRegions
-from src.ocr.tower_tracker import TowerTracker, TowerReading, determine_outcome_from_readings
+from src.ocr.tower_tracker import (
+    TowerReading,
+    TowerTracker,
+    determine_outcome_from_readings,
+)
 
 _OUTPUT_DIR = Path("output/test_frames")
 _DEFAULT_CICADAS = Path("data/models/onfield/hog-cycle-detector-best.pt")
 _DEFAULT_VISIONBOT = Path("data/models/onfield/torchroyale-enemies-best.pt")
-_DEFAULT_HAND = Path("data/models/hand_classifier/hand_classifier.pt")
+_DEFAULT_HAND = Path("data/models/hand_classifier/weights/best.pt")
 
 # Bbox colours (BGR)
-_CICADAS_COLOUR  = (0, 200, 0)    # green:  player cards
-_VISIONBOT_COLOUR = (0, 0, 220)   # red:    opponent cards
-_HAND_COLOUR     = (200, 140, 0)  # orange: hand slots
+_CICADAS_COLOUR = (0, 200, 0)  # green:  player cards
+_VISIONBOT_COLOUR = (0, 0, 220)  # red:    opponent cards
+_HAND_COLOUR = (200, 140, 0)  # orange: hand slots
 _TOWER_OPP_COLOUR = (0, 80, 220)  # red-ish: opponent towers
 _TOWER_PLR_COLOUR = (0, 220, 80)  # green-ish: player towers
-_TIMER_COLOUR = (220, 220, 0)     # cyan-ish
-_ELIXIR_COLOUR = (200, 0, 200)    # magenta
-_MULTI_COLOUR = (255, 140, 0)     # orange/blue
+_TIMER_COLOUR = (220, 220, 0)  # cyan-ish
+_ELIXIR_COLOUR = (200, 0, 200)  # magenta
+_MULTI_COLOUR = (255, 140, 0)  # orange/blue
 
 _TOWER_DEFS = [
-    ("opp_left",  "opponent_tower_left",  _TOWER_OPP_COLOUR, False),
-    ("opp_king",  "opponent_tower_king",  _TOWER_OPP_COLOUR, True),
+    ("opp_left", "opponent_tower_left", _TOWER_OPP_COLOUR, False),
+    ("opp_king", "opponent_tower_king", _TOWER_OPP_COLOUR, True),
     ("opp_right", "opponent_tower_right", _TOWER_OPP_COLOUR, False),
-    ("pl_left",   "player_tower_left",    _TOWER_PLR_COLOUR, False),
-    ("pl_king",   "player_tower_king",    _TOWER_PLR_COLOUR, True),
-    ("pl_right",  "player_tower_right",   _TOWER_PLR_COLOUR, False),
+    ("pl_left", "player_tower_left", _TOWER_PLR_COLOUR, False),
+    ("pl_king", "player_tower_king", _TOWER_PLR_COLOUR, True),
+    ("pl_right", "player_tower_right", _TOWER_PLR_COLOUR, False),
 ]
 
 
@@ -89,17 +93,29 @@ def _draw_detections(
         colour = _VISIONBOT_COLOUR if det.is_opponent else _CICADAS_COLOUR
         cv2.rectangle(out, (x1, y1), (x2, y2), colour, 2)
         label = f"{det.class_name} {det.confidence:.2f}"
-        cv2.putText(out, label, (x1, max(y1 - 6, 12)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, colour, 1, cv2.LINE_AA)
+        cv2.putText(
+            out,
+            label,
+            (x1, max(y1 - 6, 12)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            colour,
+            1,
+            cv2.LINE_AA,
+        )
 
     # Hand slots
     if game_strip is not None:
         x_left, x_right = game_strip
         game_w = x_right - x_left
         from src.detection.hand_classifier import (
-            _INSET_FRAC, _NEXT_RIGHT_FRAC, _SLOT_OFFSET_FRACS,
-            _Y_BOT_FRAC, _Y_TOP_FRAC,
+            _INSET_FRAC,
+            _NEXT_RIGHT_FRAC,
+            _SLOT_OFFSET_FRACS,
+            _Y_BOT_FRAC,
+            _Y_TOP_FRAC,
         )
+
         next_end = x_left + int(game_w * _NEXT_RIGHT_FRAC)
         y_top = int(frame_h * _Y_TOP_FRAC)
         y_bot = int(frame_h * _Y_BOT_FRAC)
@@ -113,8 +129,16 @@ def _draw_detections(
             sx1, sx2 = max(0, sx1), min(frame_w, sx2)
             cv2.rectangle(out, (sx1, y_top), (sx2, y_bot), _HAND_COLOUR, 2)
             if lbl:
-                cv2.putText(out, lbl, (sx1, y_top - 6),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, _HAND_COLOUR, 1, cv2.LINE_AA)
+                cv2.putText(
+                    out,
+                    lbl,
+                    (sx1, y_top - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    _HAND_COLOUR,
+                    1,
+                    cv2.LINE_AA,
+                )
         nx1, ny1, nx2, ny2 = get_next_bbox(frame_h, frame_w, x_left, x_right)
         cv2.rectangle(out, (nx1, ny1), (nx2, ny2), _HAND_COLOUR, 1)
 
@@ -131,8 +155,16 @@ def _draw_detections(
                 txt = f"MAX({reading.hp})"
             else:
                 txt = str(reading.hp) if reading.hp is not None else "?"
-            cv2.putText(out, txt, (x1, max(y1 - 4, 12)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, colour, 1, cv2.LINE_AA)
+            cv2.putText(
+                out,
+                txt,
+                (x1, max(y1 - 4, 12)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.42,
+                colour,
+                1,
+                cv2.LINE_AA,
+            )
 
     # Timer / elixir / multiplier OCR regions
     tx1, ty1, tx2, ty2 = ui.timer.to_tuple()
@@ -141,17 +173,33 @@ def _draw_detections(
     cv2.rectangle(out, (tx1, ty1), (tx2, ty2), _TIMER_COLOUR, 2)
     cv2.rectangle(out, (ex1, ey1), (ex2, ey2), _ELIXIR_COLOUR, 2)
     cv2.rectangle(out, (mx1, my1), (mx2, my2), _MULTI_COLOUR, 2)
-    timer_txt = "?:??" if timer_secs is None else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+    timer_txt = (
+        "?:??" if timer_secs is None else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+    )
     elixir_txt = "?" if player_elixir is None else str(player_elixir)
     header = (
         f"timer={timer_txt}  elixir={elixir_txt}  "
         f"mult(icon/phase)={multiplier_icon}/{phase_mult}  phase={phase_name}"
     )
     cv2.putText(
-        out, header, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA
+        out,
+        header,
+        (12, 24),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
     )
     cv2.putText(
-        out, header, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (30, 30, 30), 1, cv2.LINE_AA
+        out,
+        header,
+        (12, 24),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        (30, 30, 30),
+        1,
+        cv2.LINE_AA,
     )
 
     return out
@@ -177,11 +225,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--cicadas-weights", default=str(_DEFAULT_CICADAS))
     parser.add_argument("--visionbot-weights", default=str(_DEFAULT_VISIONBOT))
     parser.add_argument("--hand-weights", default=str(_DEFAULT_HAND))
-    parser.add_argument("--start",  type=int, default=0)
+    parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--stride", type=int, default=120)
-    parser.add_argument("--count",  type=int, default=20)
-    parser.add_argument("--conf",   type=float, default=0.1,
-                        help="Confidence threshold for on-field detections.")
+    parser.add_argument("--count", type=int, default=20)
+    parser.add_argument(
+        "--conf",
+        type=float,
+        default=0.1,
+        help="Confidence threshold for on-field detections.",
+    )
     return parser.parse_args()
 
 
@@ -196,10 +248,12 @@ def main() -> None:
     hand_weights = Path(args.hand_weights)
     required = [("hand classifier", hand_weights)]
     if args.onfield_backend == "dual":
-        required.extend([
-            ("cicadas", cicadas_weights),
-            ("visionbot", visionbot_weights),
-        ])
+        required.extend(
+            [
+                ("cicadas", cicadas_weights),
+                ("visionbot", visionbot_weights),
+            ]
+        )
     for label, path in required:
         if not path.exists():
             print(f"Error: {label} weights not found: {path}")
@@ -220,7 +274,7 @@ def main() -> None:
     ocr = DigitDetector()
 
     cap = cv2.VideoCapture(str(video_path))
-    fps   = cap.get(cv2.CAP_PROP_FPS)
+    fps = cap.get(cv2.CAP_PROP_FPS)
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     vid_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vid_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -237,10 +291,9 @@ def main() -> None:
 
     ui = UIRegions(vid_w, vid_h)
     trackers = {
-        label: TowerTracker(is_king=is_king)
-        for label, _, _, is_king in _TOWER_DEFS
+        label: TowerTracker(is_king=is_king) for label, _, _, is_king in _TOWER_DEFS
     }
-    last_hp  = {label: None for label, *_ in _TOWER_DEFS}
+    last_hp = {label: None for label, *_ in _TOWER_DEFS}
     timer_filled: List[Optional[int]] = []
     mult_mismatch = 0
 
@@ -261,7 +314,11 @@ def main() -> None:
         elixir_res = ocr.detect_elixir(frame, ui.elixir_number.to_tuple())
         icon_mult = ocr.detect_multiplier(frame, ui.multiplier_icon.to_tuple())
         player_elixir = elixir_res.value if elixir_res.detected else None
-        timer_filled.append(timer_secs if timer_secs is not None else (timer_filled[-1] if timer_filled else None))
+        timer_filled.append(
+            timer_secs
+            if timer_secs is not None
+            else (timer_filled[-1] if timer_filled else None)
+        )
         derived_mults, phases = derive_phases(timer_filled)
         phase_mult = derived_mults[-1] if derived_mults else 1
         phase_name = phases[-1] if phases else "single"
@@ -269,7 +326,7 @@ def main() -> None:
             mult_mismatch += 1
 
         field_result = detector.detect(frame)
-        hand_labels  = hand_clf.classify(frame, game_strip=game_strip)
+        hand_labels = hand_clf.classify(frame, game_strip=game_strip)
 
         # Tower OCR — pass 1: princess towers to establish levels
         for label, attr, _, is_king in _TOWER_DEFS:
@@ -291,7 +348,8 @@ def main() -> None:
         tower_readings: Dict[str, TowerReading] = {}
         for label, attr, _, is_king in _TOWER_DEFS:
             raw = ocr.detect_tower_raw(
-                frame, getattr(ui, attr).to_tuple(),
+                frame,
+                getattr(ui, attr).to_tuple(),
                 bottom_fraction=0.7 if is_king else 1.0,
                 invert=is_king,
             )
@@ -318,15 +376,19 @@ def main() -> None:
         cv2.imwrite(str(out_path), annotated)
 
         player_dets = sum(1 for d in field_result.on_field if not d.is_opponent)
-        opp_dets    = sum(1 for d in field_result.on_field if d.is_opponent)
-        hand_str    = ", ".join(l or "?" for l in hand_labels)
-        timer_str = "?:??" if timer_secs is None else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+        opp_dets = sum(1 for d in field_result.on_field if d.is_opponent)
+        hand_str = ", ".join(l or "?" for l in hand_labels)
+        timer_str = (
+            "?:??"
+            if timer_secs is None
+            else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+        )
         elixir_str = "?" if player_elixir is None else str(player_elixir)
-        pl_hp_str   = " | ".join(
+        pl_hp_str = " | ".join(
             f"{l.split('_')[1]}={tower_readings[l].hp or '?'}"
             for l in ["pl_left", "pl_king", "pl_right"]
         )
-        opp_hp_str  = " | ".join(
+        opp_hp_str = " | ".join(
             f"{l.split('_')[1]}={tower_readings[l].hp or '?'}"
             for l in ["opp_left", "opp_king", "opp_right"]
         )

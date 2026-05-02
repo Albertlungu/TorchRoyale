@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument("--device", default="mps")
     parser.add_argument(
         "--data",
-        default="data/hand_classifier_dataset",
+        default="data/datasets/hand_classifier_dataset",
         help="Path to the downloaded Roboflow dataset folder.",
     )
     parser.add_argument(
@@ -109,14 +109,18 @@ def main() -> None:
     print("[INFO] Starting training ...")
     t0 = time.time()
 
+    output_path = Path(args.output).resolve()
+    project_dir = output_path.parent
+    run_name = output_path.name
+
     model.train(
-        data=str(data_path),
+        data=str(data_path.resolve()),
         epochs=args.epochs,
         imgsz=args.imgsz,
         batch=args.batch,
         device=args.device,
-        project=str(Path(args.output).parent),
-        name=Path(args.output).name,
+        project=str(project_dir),
+        name=run_name,
         exist_ok=True,
         verbose=False,
     )
@@ -127,6 +131,7 @@ def main() -> None:
     print(f"\n[DONE] Total time: {elapsed_total:.0f}s")
     if best.exists():
         import shutil  # pylint: disable=import-outside-toplevel
+
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(best, dest)
         print(f"[DONE] Weights copied to {dest}")
