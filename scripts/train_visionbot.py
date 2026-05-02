@@ -75,7 +75,7 @@ def main() -> None:
     results = model.train(
         data=str(data_yaml),
         epochs=200,
-        imgsz=640,
+        imgsz=416,
         batch=batch,
         device=device,
         project=str(_OUTPUT_DIR),
