@@ -2,7 +2,6 @@
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 from PIL import Image
@@ -27,6 +26,12 @@ CARD_CONFIG = [
     (222, 543, 283, 616),
     (291, 543, 352, 616),
 ]
+PANEL_PADDING = 6
+PANEL_LINE_HEIGHT = 14
+PANEL_BG = (0, 0, 0, 180)
+PANEL_BORDER = (255, 255, 255, 200)
+READY_RGBA = (0, 200, 120, 220)
+WAIT_RGBA = (200, 120, 0, 220)
 
 
 class Visualizer(QObject):
@@ -63,6 +68,10 @@ class Visualizer(QObject):
         LABELS_DIR.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
+    def _display_name(name: str) -> str:
+        return name.replace("_", " ")
+
+    @staticmethod
     def _write_label(image: Image.Image, state: State, basename: int) -> None:
         labels = []
         for detection in state.allies + state.enemies:
@@ -92,6 +101,38 @@ class Visualizer(QObject):
         drawing.rectangle(bbox, outline=rgba)
         drawing.text(text_bbox[:2], text=text, fill="white", font=self.font)
 
+    def _draw_panel(
+        self,
+        drawing: ImageDraw.ImageDraw,
+        lines: list[str],
+        origin: tuple[int, int],
+    ) -> None:
+        if not lines:
+            return
+
+        width = max(
+            drawing.textbbox((0, 0), line, font=self.font)[2]
+            for line in lines
+        )
+        height = PANEL_PADDING * 2 + PANEL_LINE_HEIGHT * len(lines)
+        bbox = (
+            origin[0],
+            origin[1],
+            origin[0] + width + PANEL_PADDING * 2,
+            origin[1] + height,
+        )
+        drawing.rectangle(bbox, fill=PANEL_BG, outline=PANEL_BORDER)
+
+        y = origin[1] + PANEL_PADDING
+        for line in lines:
+            drawing.text(
+                (origin[0] + PANEL_PADDING, y),
+                text=line,
+                fill="white",
+                font=self.font,
+            )
+            y += PANEL_LINE_HEIGHT
+
     def _draw_unit_bboxes(
         self,
         drawing: ImageDraw.ImageDraw,
@@ -106,9 +147,60 @@ class Visualizer(QObject):
             self._draw_text(
                 drawing,
                 detection.position.bbox,
-                f"{prefix}_{detection.unit.name}",
+                (
+                    f"{prefix} {self._display_name(detection.unit.name)} "
+                    f"({detection.position.tile_x},{detection.position.tile_y})"
+                ),
                 rgba,
             )
+
+    def _draw_hand_overlay(
+        self,
+        drawing: ImageDraw.ImageDraw,
+        state: State,
+    ) -> None:
+        for index, (card, position) in enumerate(zip(state.cards, CARD_CONFIG)):
+            is_ready = index > 0 and (index - 1) in state.ready
+            rgba = READY_RGBA if is_ready else WAIT_RGBA
+            label = f"{index}: {self._display_name(card.name)}"
+            if index > 0:
+                label += " READY" if is_ready else " WAIT"
+            drawing.rectangle(position, outline=rgba, width=2)
+            self._draw_text(drawing, position, label, rgba)
+
+    def _build_field_summary(self, state: State) -> list[str]:
+        lines = [
+            "Hand: " + ", ".join(
+                self._display_name(card.name) for card in state.cards[1:5]
+            ),
+            "Ready slots: " + (
+                ", ".join(str(index + 1) for index in state.ready)
+                if state.ready
+                else "none"
+            ),
+            f"Field allies: {len(state.allies)}",
+            f"Field enemies: {len(state.enemies)}",
+        ]
+
+        if state.allies:
+            ally_summary = ", ".join(
+                (
+                    f"{self._display_name(det.unit.name)}"
+                    f"@({det.position.tile_x},{det.position.tile_y})"
+                )
+                for det in state.allies[:4]
+            )
+            lines.append(f"Allies: {ally_summary}")
+        if state.enemies:
+            enemy_summary = ", ".join(
+                (
+                    f"{self._display_name(det.unit.name)}"
+                    f"@({det.position.tile_x},{det.position.tile_y})"
+                )
+                for det in state.enemies[:4]
+            )
+            lines.append(f"Enemies: {enemy_summary}")
+        return lines
 
     def _annotate_image(self, image: Image.Image, state: State) -> Image.Image:
         drawing = ImageDraw.Draw(image, "RGBA")
@@ -119,10 +211,8 @@ class Visualizer(QObject):
 
         self._draw_unit_bboxes(drawing, state.allies, "ally")
         self._draw_unit_bboxes(drawing, state.enemies, "enemy")
-
-        for card, position in zip(state.cards, CARD_CONFIG):
-            drawing.rectangle(position)
-            self._draw_text(drawing, position, card.name)
+        self._draw_hand_overlay(drawing, state)
+        self._draw_panel(drawing, self._build_field_summary(state), (8, 8))
 
         return image
 
