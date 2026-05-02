@@ -74,7 +74,7 @@ def main() -> None:
     print(f"Starting training on {data_yaml}...")
     results = model.train(
         data=str(data_yaml),
-        epochs=200,
+        epochs=100,
         imgsz=640,
         batch=batch,
         device=device,
