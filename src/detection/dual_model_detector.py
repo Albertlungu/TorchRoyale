@@ -20,8 +20,10 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 
+from src.detection.opponent_onnx_detector import OnnxOpponentDetector
 from src.detection.result import Detection, FrameDetections
 from src.grid.coordinate_mapper import CoordinateMapper
+from src.ocr.regions import Region, UIRegions
 
 # Default weights paths
 _DEFAULT_CICADAS = "data/models/onfield/cicadas_best.pt"
@@ -35,6 +37,8 @@ _PART2_PARAMS: dict[tuple[float, float], tuple[float, float, float, float]] = {
     (2.22, 2.24): (0.020, 0.070, 0.960, 0.690),
 }
 _PART2_TARGET_W, _PART2_TARGET_H = 576, 896
+_ONNX_ARENA_TOP_MARGIN = 35
+_ONNX_ARENA_BOTTOM_MARGIN = 40
 _KATACR_SRC_CANDIDATES = [
     Path(__file__).parents[2].parent / "KataCR",
     Path("/tmp/katacr_repo"),
@@ -112,14 +116,28 @@ class DualModelDetector:
 
         _ensure_katacr_src_on_path()
         self._cicadas = YOLO(str(cicadas_path)).to(self._device)
-        self._visionbot = YOLO(str(visionbot_path)).to(self._device)
+        self._visionbot_uses_onnx = visionbot_path.suffix.lower() == ".onnx"
+        if self._visionbot_uses_onnx:
+            side_model_path = visionbot_path.with_name("side.onnx")
+            if not side_model_path.exists():
+                raise FileNotFoundError(
+                    f"Side classifier not found: {side_model_path}"
+                )
+            self._visionbot = OnnxOpponentDetector(
+                str(visionbot_path),
+                str(side_model_path),
+            )
+        else:
+            self._visionbot = YOLO(str(visionbot_path)).to(self._device)
         print(f"[DualModel] Cicadas model loaded on {self._device}")
-        print(f"[DualModel] Vision Bot model loaded on {self._device}")
+        backend = "ONNX" if self._visionbot_uses_onnx else "YOLO"
+        print(f"[DualModel] Vision Bot {backend} model loaded on {self._device}")
 
         # State (initialized in calibrate)
         self._mapper: Optional[CoordinateMapper] = None
         self._game_strip: Optional[tuple[int, int, int, int]] = None
         self._part2_params: Optional[tuple[float, float, float, float]] = None
+        self._ui_regions: Optional[UIRegions] = None
 
     def calibrate(self, frame: np.ndarray) -> None:
         """
@@ -161,6 +179,7 @@ class DualModelDetector:
         # Mapper calibrated from the game strip dimensions
         self._mapper = CoordinateMapper()
         self._mapper.calibrate_from_image(game_w, game_h)
+        self._ui_regions = UIRegions(frame_w, frame_h)
 
     def detect(self, frame: np.ndarray) -> FrameDetections:
         """
@@ -175,11 +194,21 @@ class DualModelDetector:
         if self._mapper is None or self._game_strip is None:
             self.calibrate(frame)
 
+        x_left, x_right, y_top, y_bot = self._game_strip  # type: ignore[misc]
         part2, crop_x, crop_y = self._crop_part2(frame)
 
         # Run both models
         cicadas_dets = self._run_model(self._cicadas, part2, crop_x, crop_y, is_opponent=False)
-        visionbot_dets = self._run_model(self._visionbot, part2, crop_x, crop_y, is_opponent=True)
+        if self._visionbot_uses_onnx:
+            visionbot_dets = self._run_onnx_model(frame, x_left, y_top)
+        else:
+            visionbot_dets = self._run_model(
+                self._visionbot,
+                part2,
+                crop_x,
+                crop_y,
+                is_opponent=True,
+            )
 
         # Merge and apply cross-model NMS
         all_dets = cicadas_dets + visionbot_dets
@@ -242,6 +271,19 @@ class DualModelDetector:
         boxes = results[0].boxes.data.cpu().numpy()  # (N, 6): xyxy, conf, cls
         return self._convert_to_detections(
             boxes, model.names, crop_x, crop_y, is_opponent, part2.shape
+        )
+
+    def _run_onnx_model(
+        self,
+        frame: np.ndarray,
+        game_x: int,
+        game_y: int,
+    ) -> list[Detection]:
+        raw_detections = self._visionbot.detect(frame)
+        return self._convert_onnx_to_detections(
+            raw_detections,
+            game_x,
+            game_y,
         )
 
     def _convert_to_detections(
@@ -313,6 +355,69 @@ class DualModelDetector:
             )
 
         return detections
+
+    def _convert_onnx_to_detections(
+        self,
+        raw_detections,
+        game_x: int,
+        game_y: int,
+    ) -> list[Detection]:
+        detections: list[Detection] = []
+        if not raw_detections:
+            return detections
+
+        bounds = self._mapper.bounds  # type: ignore[union-attr]
+        y_min = bounds.y_min + _ONNX_ARENA_TOP_MARGIN
+        y_max = bounds.y_max - _ONNX_ARENA_BOTTOM_MARGIN
+        for raw_det in raw_detections:
+            bx1, by1, bx2, by2 = raw_det.bbox_px
+            fx1 = game_x + bx1
+            fx2 = game_x + bx2
+            fy1 = game_y + by1
+            fy2 = game_y + by2
+
+            center_x = int((fx1 + fx2) / 2)
+            center_y = int((fy1 + fy2) / 2)
+            cx = center_x - game_x
+            cy = center_y - game_y
+            if not (
+                bounds.x_min <= cx <= bounds.x_max
+                and y_min <= cy <= y_max
+            ):
+                continue
+            if self._is_in_tower_region(center_x, center_y):
+                continue
+            tile_col, tile_row = self._mapper.pixel_to_tile(cx, cy)  # type: ignore[union-attr]
+
+            detections.append(
+                Detection(
+                    class_name=raw_det.class_name,
+                    tile_x=tile_col,
+                    tile_y=tile_row,
+                    is_opponent=True,
+                    is_on_field=True,
+                    confidence=round(raw_det.confidence, 3),
+                    bbox_px=(int(fx1), int(fy1), int(fx2), int(fy2)),
+                )
+            )
+        return detections
+
+    def _is_in_tower_region(self, center_x: int, center_y: int) -> bool:
+        if self._ui_regions is None:
+            return False
+        tower_regions = (
+            self._ui_regions.player_tower_left,
+            self._ui_regions.player_tower_king,
+            self._ui_regions.player_tower_right,
+            self._ui_regions.opponent_tower_left,
+            self._ui_regions.opponent_tower_king,
+            self._ui_regions.opponent_tower_right,
+        )
+        return any(self._contains_point(region, center_x, center_y) for region in tower_regions)
+
+    @staticmethod
+    def _contains_point(region: Region, x: int, y: int) -> bool:
+        return region.x_min <= x <= region.x_max and region.y_min <= y <= region.y_max
 
     def _apply_cross_model_nms(
         self, detections: list[Detection]

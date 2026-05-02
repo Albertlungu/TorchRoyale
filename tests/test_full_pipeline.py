@@ -46,7 +46,7 @@ from src.ocr.tower_tracker import (
 
 _OUTPUT_DIR = Path("output/test_frames")
 _DEFAULT_CICADAS = Path("data/models/onfield/hog-cycle-detector-best.pt")
-_DEFAULT_VISIONBOT = Path("data/models/onfield/torchroyale-enemies-best.pt")
+_DEFAULT_VISIONBOT = Path("data/models/units_M_480x352.onnx")
 _DEFAULT_HAND = Path("data/models/hand_classifier/weights/best.pt")
 
 # Bbox colours (BGR)
