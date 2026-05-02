@@ -2,7 +2,7 @@
 TorchRoyale 2  - vdataset fafa-zoa5z
 ==============================
 
-This dataset was exported via roboflow.com on May 1, 2026 at 9:45 PM GMT
+This dataset was exported via roboflow.com on May 2, 2026 at 1:06 AM GMT
 
 Roboflow is an end-to-end computer vision platform that helps you
 * collaborate with your team on computer vision projects
@@ -17,7 +17,7 @@ visit https://github.com/roboflow/notebooks
 
 To find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com
 
-The dataset includes 169 images.
+The dataset includes 209 images.
 Clashcards-espg are annotated in YOLOv8 format.
 
 No pre-processing or augmentation was applied.

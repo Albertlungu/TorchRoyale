@@ -2,8 +2,8 @@ train: ../train/images
 val: ../valid/images
 test: ../test/images
 
-nc: 13
-names: ['cannon', 'evo-musketeer', 'evo-skeleton', 'evo-skeletons', 'fireball', 'hero-ice-golem', 'hero-musketeer', 'hog-rider', 'ice-golem', 'ice-spirit', 'log', 'musketeer', 'skeleton']
+nc: 14
+names: ['cannon', 'evo-cannon', 'evo-musketeer', 'evo-skeleton', 'evo-skeletons', 'fireball', 'hero-ice-golem', 'hero-musketeer', 'hog-rider', 'ice-golem', 'ice-spirit', 'log', 'musketeer', 'skeleton']
 
 roboflow:
   workspace: fafa-zoa5z
