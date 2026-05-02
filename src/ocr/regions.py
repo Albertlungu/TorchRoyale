@@ -11,6 +11,7 @@ Public API:
   Region    -- (x_min, y_min, x_max, y_max) pixel rectangle
   UIRegions -- per-resolution set of timer, elixir, and multiplier regions
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -102,49 +103,43 @@ class UIRegions:
         )
 
         # Tower HP regions - Player side (bottom)
-        # Left tower: ~2% from left, ~96% down
         self.player_tower_left = Region(
-            x_min=int(frame_w * 0.02),
-            y_min=int(frame_h * 0.96),
-            x_max=int(frame_w * 0.06),
-            y_max=int(frame_h * 0.98),
+            x_min=int(frame_w * 0.11),
+            y_min=int(frame_h * 0.57),
+            x_max=int(frame_w * 0.31),
+            y_max=int(frame_h * 0.68),
         )
-        # King tower: ~48% from left, ~96% down
         self.player_tower_king = Region(
-            x_min=int(frame_w * 0.48),
-            y_min=int(frame_h * 0.96),
-            x_max=int(frame_w * 0.52),
-            y_max=int(frame_h * 0.98),
+            x_min=int(frame_w * 0.40),
+            y_min=int(frame_h * 0.74),
+            x_max=int(frame_w * 0.61),
+            y_max=int(frame_h * 0.78),
         )
-        # Right tower: ~94% from left, ~96% down
         self.player_tower_right = Region(
-            x_min=int(frame_w * 0.94),
-            y_min=int(frame_h * 0.96),
-            x_max=int(frame_w * 0.98),
-            y_max=int(frame_h * 0.98),
+            x_min=int(frame_w * 0.70),
+            y_min=int(frame_h * 0.57),
+            x_max=int(frame_w * 0.90),
+            y_max=int(frame_h * 0.68),
         )
 
         # Tower HP regions - Opponent side (top)
-        # Left tower: ~2% from left, ~2% down
         self.opponent_tower_left = Region(
-            x_min=int(frame_w * 0.02),
-            y_min=int(frame_h * 0.02),
-            x_max=int(frame_w * 0.06),
-            y_max=int(frame_h * 0.04),
+            x_min=int(frame_w * 0.11),
+            y_min=int(frame_h * 0.16),
+            x_max=int(frame_w * 0.31),
+            y_max=int(frame_h * 0.29),
         )
-        # King tower: ~48% from left, ~2% down
         self.opponent_tower_king = Region(
-            x_min=int(frame_w * 0.48),
-            y_min=int(frame_h * 0.02),
-            x_max=int(frame_w * 0.52),
-            y_max=int(frame_h * 0.04),
+            x_min=int(frame_w * 0.40),
+            y_min=int(frame_h * 0.07),
+            x_max=int(frame_w * 0.61),
+            y_max=int(frame_h * 0.11),
         )
-        # Right tower: ~94% from left, ~2% down
         self.opponent_tower_right = Region(
-            x_min=int(frame_w * 0.94),
-            y_min=int(frame_h * 0.02),
-            x_max=int(frame_w * 0.98),
-            y_max=int(frame_h * 0.04),
+            x_min=int(frame_w * 0.70),
+            y_min=int(frame_h * 0.16),
+            x_max=int(frame_w * 0.90),
+            y_max=int(frame_h * 0.29),
         )
 
     # ------------------------------------------------------------------
@@ -200,7 +195,9 @@ class UIRegions:
         desired_h = max(4, self.timer.height)
         new_x_max = min(frame_w, rightmost + padding)
         new_x_min = max(0, new_x_max - desired_w)
-        new_y_min = min(max(0, self.timer.y_min + shift_down), max(0, frame_h - desired_h))
+        new_y_min = min(
+            max(0, self.timer.y_min + shift_down), max(0, frame_h - desired_h)
+        )
         new_y_max = new_y_min + desired_h
         self.timer = Region(new_x_min, new_y_min, new_x_max, new_y_max)
         return (rightmost, self.timer.to_tuple())
@@ -270,6 +267,7 @@ class UIRegions:
             (leftmost_col, bar_row, run_length, new_region_tuple) if realigned, else None.
         """
         import cv2  # pylint: disable=import-outside-toplevel
+
         if not self._is_black(frame, self.elixir_number, black_thresh):
             return None
         frame_h, frame_w = frame.shape[:2]

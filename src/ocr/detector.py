@@ -232,76 +232,62 @@ class DigitDetector:
         return 2
 
     # ------------------------------------------------------------------
-    # Tower HP
+    # Tower OCR
     # ------------------------------------------------------------------
 
-    def detect_tower_hp(
-        self, frame: np.ndarray, region: Tuple[int, int, int, int]
-    ) -> OCRResult:
+    def detect_tower_raw(
+        self,
+        frame: np.ndarray,
+        region: Tuple[int, int, int, int],
+        bottom_fraction: float = 1.0,
+        invert: bool = False,
+    ) -> str:
         """
-        Read tower HP percentage from a frame region.
+        Read all digits visible in a tower bbox as a raw string.
 
-        Towers show HP as a number (e.g., "1234" for 1234 HP).
-        We read the digits and return a percentage (0-100).
+        The bbox covers the whole tower image, which may show:
+          - just a level number (e.g., "15")
+          - level + HP concatenated (e.g., "154176")
+          - nothing if the tower is destroyed
+
+        The caller (TowerTracker) is responsible for interpreting the string.
 
         Args:
-            frame:  full BGR frame.
-            region: (x1, y1, x2, y2) crop rectangle.
+            frame:           full BGR frame.
+            region:          (x1, y1, x2, y2) crop rectangle.
+            bottom_fraction: if < 1.0, only the bottom fraction of the crop is
+                             read. Useful to skip crown prongs on king towers.
+            invert:          invert the binary before OCR. Required for king
+                             tower crown badges where digits are dark on bright.
 
         Returns:
-            OCRResult with HP percentage (0-100) or 100 if unreadable.
+            Digit-only string, may be empty if nothing detected.
         """
         x1, y1, x2, y2 = region
         roi = frame[y1:y2, x1:x2]
         if roi.size == 0:
-            return OCRResult(100, 0.0, False)
+            return ""
+
+        if bottom_fraction < 1.0:
+            cut = int(roi.shape[0] * (1.0 - bottom_fraction))
+            roi = roi[cut:, :]
+            if roi.size == 0:
+                return ""
 
         processed = self._preprocess(roi)
+        if invert:
+            processed = cv2.bitwise_not(processed)
         try:
             results: List = self._get_reader().readtext(
                 processed, allowlist="0123456789", paragraph=False, min_size=5
             )
         except Exception:  # pylint: disable=broad-exception-caught
-            return OCRResult(100, 0.0, False)
+            return ""
 
         if not results:
-            return OCRResult(100, 0.0, False)
+            return ""
 
-        # Get the text with highest confidence
-        best = max(results, key=lambda item: item[2])
-        text = best[1].strip()
-
-        # Parse HP value
-        hp_value = self._parse_hp(text)
-        if hp_value is not None:
-            return OCRResult(hp_value, best[2], True, text)
-        return OCRResult(100, 0.0, False, text)
-
-    @staticmethod
-    def _parse_hp(text: str) -> Optional[int]:
-        """
-        Parse a tower HP string into a percentage (0-100).
-
-        Args:
-            text: raw OCR text (e.g., "1234", "100").
-
-        Returns:
-            HP percentage (0-100), or None if unparseable.
-        """
-        if not text:
-            return None
-
-        # Extract digits only
-        digits = "".join(c for c in text if c.isdigit())
-        if not digits:
-            return None
-
-        # Tower HP is typically 3-4 digits, convert to percentage
-        value = int(digits)
-
-        # If value > 100, it's likely raw HP (e.g., 1234)
-        # Convert to percentage (assuming max HP ~3000)
-        if value > 100:
-            value = min(100, int((value / 3000) * 100))
-
-        return max(0, min(100, value))
+        # Concatenate all detected digit groups left-to-right
+        results_sorted = sorted(results, key=lambda r: r[0][0][0])
+        digits = "".join("".join(c for c in r[1] if c.isdigit()) for r in results_sorted)
+        return digits
