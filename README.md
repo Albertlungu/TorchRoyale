@@ -2,6 +2,36 @@
 
 A complete machine learning pipeline for training a Decision Transformer model to play Clash Royale. The system analyzes gameplay videos, detects cards and units in real-time, tracks hand state across frames, and generates training episodes for a causal transformer model.
 
+## YOLO26 Windows Training
+
+For the Roboflow Universe project `stuff-j62hv/clash-royale-all-enemy-cards`, use the single-entry Windows script:
+
+```bat
+set ROBOFLOW_API_KEY=your_key_here
+py -3 scripts\train_roboflow_yolo26_windows.py train --device auto
+```
+
+This pipeline applies the requested preprocessing and augmentation locally:
+- Stretch to `640x640`
+- `2` augmented train outputs per original train example
+- Hue between `-11` and `+11` degrees
+- Saturation between `-25%` and `+25%`
+- Brightness between `-15%` and `+15%`
+- Blur up to `0.4px`
+- Noise up to `0.32%` of pixels
+
+After training, canonical artifacts are copied to:
+- `data/models/onfield/clash-royale-all-enemy-cards-yolo26n-best.pt`
+- `data/models/onfield/clash-royale-all-enemy-cards-yolo26n-best.onnx`
+
+Run inference from the same entry point:
+
+```bat
+py -3 scripts\train_roboflow_yolo26_windows.py infer --source C:\path\to\image_or_video.jpg
+```
+
+For CUDA on Windows, use a CUDA-enabled PyTorch install so the default `.pt` inference path runs on GPU automatically when available.
+
 ## Architecture Overview
 
 ```mermaid
@@ -738,4 +768,3 @@ Modify via `--context-len`, `--lr`, `--batch-size` CLI flags or edit `DTConfig` 
 - **KataCR**: https://github.com/yuanluya/KataCR (YOLOv8 Clash Royale models)
 - **Decision Transformer**: https://arxiv.org/abs/2202.05566 (Offline RL via offline data)
 - **Clash Royale**: https://supercell.com/en/games/clashroyale/ (Official game)
-
