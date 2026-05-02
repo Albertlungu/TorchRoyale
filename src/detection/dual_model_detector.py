@@ -13,6 +13,7 @@ Public API:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -34,6 +35,18 @@ _PART2_PARAMS: dict[tuple[float, float], tuple[float, float, float, float]] = {
     (2.22, 2.24): (0.020, 0.070, 0.960, 0.690),
 }
 _PART2_TARGET_W, _PART2_TARGET_H = 576, 896
+_KATACR_SRC_CANDIDATES = [
+    Path(__file__).parents[2].parent / "KataCR",
+    Path("/tmp/katacr_repo"),
+]
+
+
+def _ensure_katacr_src_on_path() -> None:
+    """Add KataCR source tree to sys.path so custom checkpoints can unpickle."""
+    for candidate in _KATACR_SRC_CANDIDATES:
+        if candidate.is_dir() and str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+            break
 
 
 class DualModelDetector:
@@ -97,6 +110,7 @@ class DualModelDetector:
         # Load models
         from ultralytics import YOLO
 
+        _ensure_katacr_src_on_path()
         self._cicadas = YOLO(str(cicadas_path)).to(self._device)
         self._visionbot = YOLO(str(visionbot_path)).to(self._device)
         print(f"[DualModel] Cicadas model loaded on {self._device}")

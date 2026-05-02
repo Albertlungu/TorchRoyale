@@ -29,6 +29,7 @@ import cv2
 
 from src.detection.hand_classifier import HandClassifier
 from src.detection.hand_tracker import HandTracker
+from src.detection.on_field_tracker import OnFieldTracker
 from src.detection.dual_model_detector import DualModelDetector
 from src.ocr.detector import DigitDetector
 from src.ocr.regions import UIRegions
@@ -75,6 +76,7 @@ class VideoAnalyzer:
         self._ocr = DigitDetector(preload=preload_ocr)
         self._hand_tracker = HandTracker()
         self._hand_clf = HandClassifier()
+        self._field_tracker = OnFieldTracker(window=4)
 
     def analyze_video(self, video_path: str) -> Dict[str, Any]:
         """
@@ -114,6 +116,7 @@ class VideoAnalyzer:
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
         self._hand_tracker.reset()
+        self._field_tracker.reset()
 
         frames: List[FrameDict] = []
         frame_num: int = 0
@@ -127,34 +130,34 @@ class VideoAnalyzer:
 
             ts_ms: int = int(cap.get(cv2.CAP_PROP_POS_MSEC))
 
-        # Rebuild per-frame UI regions for alignment drift
-        frame_ui = UIRegions(vid_w, vid_h)
-        frame_ui.align_timer(frame)
-        frame_ui.align_elixir(frame)
-        frame_ui.align_multiplier(frame)
+            # Rebuild per-frame UI regions for alignment drift
+            frame_ui = UIRegions(vid_w, vid_h)
+            frame_ui.align_timer(frame)
+            frame_ui.align_elixir(frame)
+            frame_ui.align_multiplier(frame)
 
-        timer_secs = self._ocr.detect_timer(frame, frame_ui.timer.to_tuple())
-        elixir_result = self._ocr.detect_elixir(frame, frame_ui.elixir_number.to_tuple())
-        mult = self._ocr.detect_multiplier(frame, frame_ui.multiplier_icon.to_tuple())
-        player_elixir: Optional[int] = (
-            elixir_result.value if elixir_result.detected else None
-        )
+            timer_secs = self._ocr.detect_timer(frame, frame_ui.timer.to_tuple())
+            elixir_result = self._ocr.detect_elixir(frame, frame_ui.elixir_number.to_tuple())
+            mult = self._ocr.detect_multiplier(frame, frame_ui.multiplier_icon.to_tuple())
+            player_elixir: Optional[int] = (
+                elixir_result.value if elixir_result.detected else None
+            )
 
-        # Tower HP detection (6 towers total: 3 player, 3 opponent)
-        player_towers = {
-            "player_left": self._read_tower_hp(frame, frame_ui.player_tower_left),
-            "player_king": self._read_tower_hp(frame, frame_ui.player_tower_king),
-            "player_right": self._read_tower_hp(frame, frame_ui.player_tower_right),
-        }
-        opponent_towers = {
-            "opponent_left": self._read_tower_hp(frame, frame_ui.opponent_tower_left),
-            "opponent_king": self._read_tower_hp(frame, frame_ui.opponent_tower_king),
-            "opponent_right": self._read_tower_hp(frame, frame_ui.opponent_tower_right),
-        }
+            # Tower HP detection (6 towers total: 3 player, 3 opponent)
+            player_towers = {
+                "player_left": self._read_tower_hp(frame, frame_ui.player_tower_left),
+                "player_king": self._read_tower_hp(frame, frame_ui.player_tower_king),
+                "player_right": self._read_tower_hp(frame, frame_ui.player_tower_right),
+            }
+            opponent_towers = {
+                "opponent_left": self._read_tower_hp(frame, frame_ui.opponent_tower_left),
+                "opponent_king": self._read_tower_hp(frame, frame_ui.opponent_tower_king),
+                "opponent_right": self._read_tower_hp(frame, frame_ui.opponent_tower_right),
+            }
 
             # Dual-model battlefield detection
             field_result = self._dual_detector.detect(frame)
-            on_field_dets: List[DetectionDict] = [
+            raw_field_dets: List[DetectionDict] = [
                 DetectionDict(
                     class_name=det.class_name,
                     tile_x=det.tile_x,
@@ -165,6 +168,9 @@ class VideoAnalyzer:
                 )
                 for det in field_result.on_field
             ]
+            # Persistence window: cards absent for ≤4 sampled frames are kept
+            # alive at their last known position to suppress detection flicker.
+            on_field_dets: List[DetectionDict] = self._field_tracker.update(raw_field_dets)
 
             # Local hand classifier — identify the 4 hand slots
             x_left, x_right = (

@@ -1,12 +1,18 @@
 """
-Full pipeline test: cicadas, visionbot, hand classifier, and tower HP.
+Full pipeline test for model + OCR integration.
+
+Covers:
+  - On-field models:
+      - Cicadas (player cards, hog-cycle classes)
+      - Visionbot (opponent cards, enemies classes)
+  - Hand classifier
+  - Tower HP OCR + win/loss inference
+  - Player elixir OCR
+  - Timer OCR
+  - Multiplier icon OCR + derived game phase tracking
 
 Runs detection every --stride frames starting at --start on a specified video.
-Saves annotated frames to output/test_frames/ with:
-  - Green boxes:  player cards (Cicadas model)
-  - Red boxes:    opponent cards (Vision Bot model)
-  - Blue boxes:   hand card slots (Hand Classifier)
-  - Yellow boxes: tower OCR regions with HP overlay
+Saves annotated frames to output/test_frames/.
 
 Usage:
   python tests/test_full_pipeline.py data/replays/Game_23.mp4
@@ -27,12 +33,17 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from src.detection.dual_model_detector import DualModelDetector
 from src.detection.hand_classifier import HandClassifier, get_next_bbox
+from src.detection.katacr_legacy import KataCRDetector
 from src.detection.result import Detection
+from src.game_state.phase import derive_phases
 from src.ocr.detector import DigitDetector
 from src.ocr.regions import UIRegions
 from src.ocr.tower_tracker import TowerTracker, TowerReading, determine_outcome_from_readings
 
 _OUTPUT_DIR = Path("output/test_frames")
+_DEFAULT_CICADAS = Path("data/models/onfield/hog-cycle-detector-best.pt")
+_DEFAULT_VISIONBOT = Path("data/models/onfield/torchroyale-enemies-best.pt")
+_DEFAULT_HAND = Path("data/models/hand_classifier/hand_classifier.pt")
 
 # Bbox colours (BGR)
 _CICADAS_COLOUR  = (0, 200, 0)    # green:  player cards
@@ -40,6 +51,9 @@ _VISIONBOT_COLOUR = (0, 0, 220)   # red:    opponent cards
 _HAND_COLOUR     = (200, 140, 0)  # orange: hand slots
 _TOWER_OPP_COLOUR = (0, 80, 220)  # red-ish: opponent towers
 _TOWER_PLR_COLOUR = (0, 220, 80)  # green-ish: player towers
+_TIMER_COLOUR = (220, 220, 0)     # cyan-ish
+_ELIXIR_COLOUR = (200, 0, 200)    # magenta
+_MULTI_COLOUR = (255, 140, 0)     # orange/blue
 
 _TOWER_DEFS = [
     ("opp_left",  "opponent_tower_left",  _TOWER_OPP_COLOUR, False),
@@ -58,6 +72,11 @@ def _draw_detections(
     game_strip: Optional[Tuple[int, int]],
     ui: UIRegions,
     tower_readings: Dict[str, TowerReading],
+    timer_secs: Optional[int],
+    player_elixir: Optional[int],
+    multiplier_icon: int,
+    phase_mult: int,
+    phase_name: str,
 ) -> np.ndarray:
     out = frame.copy()
     frame_h, frame_w = out.shape[:2]
@@ -115,6 +134,26 @@ def _draw_detections(
             cv2.putText(out, txt, (x1, max(y1 - 4, 12)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.42, colour, 1, cv2.LINE_AA)
 
+    # Timer / elixir / multiplier OCR regions
+    tx1, ty1, tx2, ty2 = ui.timer.to_tuple()
+    ex1, ey1, ex2, ey2 = ui.elixir_number.to_tuple()
+    mx1, my1, mx2, my2 = ui.multiplier_icon.to_tuple()
+    cv2.rectangle(out, (tx1, ty1), (tx2, ty2), _TIMER_COLOUR, 2)
+    cv2.rectangle(out, (ex1, ey1), (ex2, ey2), _ELIXIR_COLOUR, 2)
+    cv2.rectangle(out, (mx1, my1), (mx2, my2), _MULTI_COLOUR, 2)
+    timer_txt = "?:??" if timer_secs is None else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+    elixir_txt = "?" if player_elixir is None else str(player_elixir)
+    header = (
+        f"timer={timer_txt}  elixir={elixir_txt}  "
+        f"mult(icon/phase)={multiplier_icon}/{phase_mult}  phase={phase_name}"
+    )
+    cv2.putText(
+        out, header, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA
+    )
+    cv2.putText(
+        out, header, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (30, 30, 30), 1, cv2.LINE_AA
+    )
+
     return out
 
 
@@ -129,6 +168,15 @@ def _detect_game_strip(frame: np.ndarray) -> Optional[Tuple[int, int]]:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Full pipeline smoke test.")
     parser.add_argument("video", help="Path to input video file.")
+    parser.add_argument(
+        "--onfield-backend",
+        choices=["dual", "katacr-legacy"],
+        default="dual",
+        help="On-field detector backend. 'dual' uses cicadas+opponent model; 'katacr-legacy' uses KataCR detector1+detector2.",
+    )
+    parser.add_argument("--cicadas-weights", default=str(_DEFAULT_CICADAS))
+    parser.add_argument("--visionbot-weights", default=str(_DEFAULT_VISIONBOT))
+    parser.add_argument("--hand-weights", default=str(_DEFAULT_HAND))
     parser.add_argument("--start",  type=int, default=0)
     parser.add_argument("--stride", type=int, default=120)
     parser.add_argument("--count",  type=int, default=20)
@@ -143,12 +191,32 @@ def main() -> None:
     if not video_path.exists():
         print(f"Error: video not found: {video_path}")
         sys.exit(1)
+    cicadas_weights = Path(args.cicadas_weights)
+    visionbot_weights = Path(args.visionbot_weights)
+    hand_weights = Path(args.hand_weights)
+    required = [("hand classifier", hand_weights)]
+    if args.onfield_backend == "dual":
+        required.extend([
+            ("cicadas", cicadas_weights),
+            ("visionbot", visionbot_weights),
+        ])
+    for label, path in required:
+        if not path.exists():
+            print(f"Error: {label} weights not found: {path}")
+            sys.exit(1)
 
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Initializing detectors...")
-    detector = DualModelDetector(conf_threshold=args.conf)
-    hand_clf = HandClassifier()
+    if args.onfield_backend == "katacr-legacy":
+        detector = KataCRDetector()
+    else:
+        detector = DualModelDetector(
+            cicadas_weights=str(cicadas_weights),
+            visionbot_weights=str(visionbot_weights),
+            conf_threshold=args.conf,
+        )
+    hand_clf = HandClassifier(weights_path=str(hand_weights))
     ocr = DigitDetector()
 
     cap = cv2.VideoCapture(str(video_path))
@@ -173,6 +241,8 @@ def main() -> None:
         for label, _, _, is_king in _TOWER_DEFS
     }
     last_hp  = {label: None for label, *_ in _TOWER_DEFS}
+    timer_filled: List[Optional[int]] = []
+    mult_mismatch = 0
 
     saved = 0
     frame_idx = args.start
@@ -183,7 +253,20 @@ def main() -> None:
         if not ok:
             break
 
+        ui.align_timer(frame)
+        ui.align_elixir(frame)
+        ui.align_multiplier(frame)
         game_strip = _detect_game_strip(frame)
+        timer_secs = ocr.detect_timer(frame, ui.timer.to_tuple())
+        elixir_res = ocr.detect_elixir(frame, ui.elixir_number.to_tuple())
+        icon_mult = ocr.detect_multiplier(frame, ui.multiplier_icon.to_tuple())
+        player_elixir = elixir_res.value if elixir_res.detected else None
+        timer_filled.append(timer_secs if timer_secs is not None else (timer_filled[-1] if timer_filled else None))
+        derived_mults, phases = derive_phases(timer_filled)
+        phase_mult = derived_mults[-1] if derived_mults else 1
+        phase_name = phases[-1] if phases else "single"
+        if icon_mult != phase_mult:
+            mult_mismatch += 1
 
         field_result = detector.detect(frame)
         hand_labels  = hand_clf.classify(frame, game_strip=game_strip)
@@ -218,7 +301,17 @@ def main() -> None:
                 last_hp[label] = reading.hp
 
         annotated = _draw_detections(
-            frame, field_result.on_field, hand_labels, game_strip, ui, tower_readings
+            frame,
+            field_result.on_field,
+            hand_labels,
+            game_strip,
+            ui,
+            tower_readings,
+            timer_secs,
+            player_elixir,
+            icon_mult,
+            phase_mult,
+            phase_name,
         )
 
         out_path = _OUTPUT_DIR / f"frame_{frame_idx}.jpg"
@@ -227,6 +320,8 @@ def main() -> None:
         player_dets = sum(1 for d in field_result.on_field if not d.is_opponent)
         opp_dets    = sum(1 for d in field_result.on_field if d.is_opponent)
         hand_str    = ", ".join(l or "?" for l in hand_labels)
+        timer_str = "?:??" if timer_secs is None else f"{timer_secs // 60}:{timer_secs % 60:02d}"
+        elixir_str = "?" if player_elixir is None else str(player_elixir)
         pl_hp_str   = " | ".join(
             f"{l.split('_')[1]}={tower_readings[l].hp or '?'}"
             for l in ["pl_left", "pl_king", "pl_right"]
@@ -239,6 +334,9 @@ def main() -> None:
             f"frame {frame_idx:5d}  "
             f"({player_dets}pl/{opp_dets}opp on-field)  "
             f"hand=[{hand_str}]  "
+            f"timer={timer_str}  "
+            f"elixir={elixir_str}  "
+            f"mult(icon/phase)={icon_mult}/{phase_mult} phase={phase_name}  "
             f"pl_towers=[{pl_hp_str}]  opp_towers=[{opp_hp_str}]"
         )
 
@@ -258,6 +356,7 @@ def main() -> None:
     )
     print(f"\nDone! {saved} frames saved to {_OUTPUT_DIR}")
     print(f"Inferred outcome: {outcome.upper()}")
+    print(f"Multiplier disagreements (icon vs timer-derived): {mult_mismatch}/{saved}")
 
 
 if __name__ == "__main__":

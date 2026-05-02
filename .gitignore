@@ -16,6 +16,7 @@ data/hand_classifier_dataset/
 
 # Outputs — not tracked
 output/
+!output/test_cicadas
 logs/
 runs/
 
