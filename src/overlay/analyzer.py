@@ -52,7 +52,7 @@ class VideoAnalyzer:
         preload_ocr: bool = False,
         verbose: bool = True,
         cicadas_weights: str = "data/models/onfield/cicadas_best.pt",
-        visionbot_weights: str = "data/models/onfield/visionbot_best.pt",
+        visionbot_weights: str = "data/models/units_M_480x352.onnx",
     ) -> None:
         """
         Args:

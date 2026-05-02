@@ -25,7 +25,7 @@ from src.grid.coordinate_mapper import CoordinateMapper
 
 # Default weights paths
 _DEFAULT_CICADAS = "data/models/onfield/cicadas_best.pt"
-_DEFAULT_VISIONBOT = "data/models/onfield/visionbot_best.pt"
+_DEFAULT_VISIONBOT = "data/models/units_M_480x352.onnx"
 
 # part2 crop params per aspect-ratio bucket (x, y, w, h as fractions of game strip)
 # Mirrors the values from katacr.py for pixel-perfect compatibility
