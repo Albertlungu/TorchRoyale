@@ -42,7 +42,7 @@ def _detect_device() -> str:
 def main() -> None:
     """Train YOLOv8n on the Cicadas dataset."""
     print("=" * 60)
-    print("Cicadas YOLOv8s Training")
+    print("Hog Cycle Player Detector YOLOv8s Training")
     print("=" * 60)
 
     # Verify dataset exists
@@ -79,7 +79,7 @@ def main() -> None:
         batch=batch,
         device=device,
         project=str(_OUTPUT_DIR),
-        name="cicadas-v3",
+        name="hog-cycle-detector",
         save=True,
         save_period=2,
         verbose=True,
@@ -115,7 +115,7 @@ def main() -> None:
         print(f"Could not compute per-class AP: {e}")
 
     # Copy best.pt to canonical path
-    best_source = _OUTPUT_DIR / "cicadas-v3" / "weights" / "best.pt"
+    best_source = _OUTPUT_DIR / "hog-cycle-detector" / "weights" / "best.pt"
     best_dest = _OUTPUT_DIR / _BEST_WEIGHTS_NAME
 
     if best_source.exists():

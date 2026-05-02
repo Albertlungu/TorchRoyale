@@ -493,6 +493,30 @@ To update outcomes, edit the `GAME_OUTCOMES` dict in `src/data/game_outcomes.py`
 
 ---
 
+## Datasets
+
+Four Roboflow datasets are used across the two detection models.
+
+### Player Card Detector (Hog Cycle)
+
+| Dataset | Source | License | Classes | Notes |
+|---------|--------|---------|---------|-------|
+| **Cicadas — Clash Royale Hog 2.6** | [roboflow.com/cicadas/clash-royale-9eug2](https://universe.roboflow.com/cicadas/clash-royale-9eug2/dataset/1) | CC BY 4.0 | 10 | Core Hog 2.6 deck cards; baseline player-side annotations |
+| **TorchRoyale Hog Cycle** | Private (Roboflow workspace: fafa-zoa5z) | Private | 13 | Custom annotations extending the cicadas dataset with hero variants, evo-cannon, and evo-musketeer |
+
+Both are merged into `data/datasets/cicadas_merged` (14 classes, 580 train images) for training.
+
+### Opponent Card Detector
+
+| Dataset | Source | License | Classes | Notes |
+|---------|--------|---------|---------|-------|
+| **Vision Bot — All Enemy Cards** | [roboflow.com/vision-bot/clash-royale-all-enemy-cards-w9haz](https://universe.roboflow.com/vision-bot/clash-royale-all-enemy-cards-w9haz/dataset/1) | CC BY 4.0 | 133 | Broad coverage of all Clash Royale cards; 8244 train images |
+| **TorchRoyale Enemies** | Private (Roboflow workspace: fafa-zoa5z) | Private | 78 | Custom annotations targeting hero variants (hero-knight, hero-giant, hero-mini-pekka, hero-musketeer) and additional evo cards not covered by Vision Bot |
+
+Both are merged into `data/datasets/enemies_dataset` (149 classes, ~8500 train images) for training.
+
+---
+
 ## Model Versions
 
 ### Cicadas (Player Card Detector)
