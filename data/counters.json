@@ -1,0 +1,96 @@
+{
+  "Hog Rider": {
+    "counters": [
+      "Cannon",
+      "Tesla",
+      "Inferno Tower",
+      "Bomb Tower",
+      "Goblin Cage",
+      "Tombstone",
+      "Barbarians",
+      "Mini P.E.K.K.A",
+      "Tornado"
+    ],
+    "counter_to_counter": [
+      "Fireball (destroy or weaken buildings/Barbarians)",
+      "Earthquake (if variant deck)",
+      "Log (clear swarm like Tombstone)",
+      "Ice Golem (kite/support vs Mini P.E.K.K.A)",
+      "Prediction Fireball/Log"
+    ]
+  },
+  "Musketeer": {
+    "counters": [
+      "Fireball",
+      "Lightning",
+      "Poison",
+      "Rocket",
+      "Mini tanks (Knight, Valkyrie)",
+      "Swarm (Minions, Skeleton Army)"
+    ],
+    "counter_to_counter": [
+      "Spread troops (avoid spell value)",
+      "Ice Golem (tank for Musketeer)",
+      "Log (clear swarm)",
+      "Fireball (punish grouped counters)"
+    ]
+  },
+  "Cannon": {
+    "counters": [
+      "Lightning",
+      "Earthquake",
+      "Fireball (chip)",
+      "Tank + support pushes"
+    ],
+    "counter_to_counter": [
+      "Cycle quickly to another Cannon",
+      "Use Musketeer for support defense",
+      "Ice Golem to kite tanks",
+      "Pressure opposite lane with Hog"
+    ]
+  },
+  "Ice Golem": {
+    "counters": [
+      "Any DPS troop",
+      "Air troops (ignore it)",
+      "Buildings (stall)"
+    ],
+    "counter_to_counter": [
+      "Use death damage to clear swarms",
+      "Pair with Hog Rider",
+      "Kite units into Musketeer/Cannon range"
+    ]
+  },
+  "Skeletons": {
+    "counters": ["Log", "Zap", "Arrows", "Splash units"],
+    "counter_to_counter": [
+      "Bait small spells",
+      "Outcycle opponent’s spells",
+      "Use as distraction after spell is used"
+    ]
+  },
+  "Ice Spirit": {
+    "counters": ["Any troop", "Spells"],
+    "counter_to_counter": [
+      "Cycle quickly",
+      "Use for freeze timing with Hog",
+      "Force inefficient responses"
+    ]
+  },
+  "Fireball": {
+    "counters": ["Spread troops", "High HP units", "Spell bait decks"],
+    "counter_to_counter": [
+      "Predict troop placement",
+      "Pair with Log for extra value",
+      "Use on towers when no value targets"
+    ]
+  },
+  "The Log": {
+    "counters": ["Air troops", "Spread placement", "High HP ground troops"],
+    "counter_to_counter": [
+      "Save for key swarm units",
+      "Combine with Fireball",
+      "Outcycle opponent’s bait cards"
+    ]
+  }
+}

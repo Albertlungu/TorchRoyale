@@ -1,10 +1,5 @@
 """
-HybridStrategy: Production-grade ensemble of Decision Transformer and Heuristic Strategy.
-
-This strategy implements a two-tier decision system where the Decision Transformer
-provides strategic embeddings that inform heuristic scoring functions. The architecture
-is designed for robustness, with the DT handling macro-level strategy and heuristics
-providing micro-level tactical validation.
+HybridStrategy: Ensemble of Decision Transformer and Heuristic Strategy.
 
 Architecture:
   1. DT Model loads and processes game state into 128-dimensional strategic embeddings
@@ -12,10 +7,6 @@ Architecture:
   3. Heuristic Ensemble scores actions using context-aware scoring functions
   4. Decision Fusion layer combines DT predictions with heuristic scores using learned weights
   5. Safety Validator ensures final decision meets game constraints
-
-The DT model is loaded from checkpoint and runs inference each frame, but due to
-on-field detection quality issues in production, the heuristic layer provides
-necessary tactical refinement to ensure valid, optimal placements.
 
 Public API:
   HybridStrategy -- load once, then call recommend(state) each frame
@@ -44,6 +35,7 @@ from src.actions import (
 )
 from src.constants.cards import elixir_cost
 from src.constants.game import GRID_COLS, GRID_ROWS, PLAYER_SIDE_MIN_ROW
+from src.game_state.opponent_tracker import OpponentTracker
 
 if TYPE_CHECKING:
     from src.types import FrameDict
@@ -150,7 +142,7 @@ def _extract_state_features(state: FrameDict) -> np.ndarray:
 
 
 def _extract_strategic_context(
-    embedding: np.ndarray, state: FrameDict
+    embedding: np.ndarray, state: FrameDict, opponent_tracker: OpponentTracker
 ) -> Dict[str, float]:
     """Extract strategic parameters from DT embedding through learned transformation."""
     sig = _generate_state_signature(state)
@@ -162,13 +154,28 @@ def _extract_strategic_context(
     # MLP-style transformation of embedding to strategic parameters
     context = {}
 
-    # Strategic parameters extracted from embedding dimensions
-    context["aggression_factor"] = float(np.tanh(embedding[0] * 2.0))
-    context["defensive_weight"] = float(1.0 / (1.0 + np.exp(-embedding[1] * 1.5)))
+    # Calculate elixir advantage
+    player_elixir = float(state.get("player_elixir", 0) or 0)
+    elixir_advantage = opponent_tracker.get_elixir_advantage(player_elixir)
+
+    # Strategic parameters based on game state and embedding
+    # Elixir advantage directly influences aggression/defense
+    context["elixir_advantage"] = float(elixir_advantage)
+    context["aggression_factor"] = float(
+        np.tanh(elixir_advantage * 0.3 + embedding[0] * 0.5)
+    )
+    context["defensive_weight"] = float(
+        1.0 / (1.0 + np.exp(elixir_advantage * 0.5 + embedding[1] * 1.5))
+    )
     context["elixir_conservatism"] = float(np.clip(embedding[2] * 0.5 + 0.5, 0, 1))
     context["bridge_pressure"] = float(1.0 / (1.0 + np.exp(-embedding[3] * 3.0)))
     context["spell_readiness"] = float(1.0 / (1.0 + np.exp(-embedding[4] * 2.0)))
     context["tank_support_ratio"] = float(np.tanh(embedding[5]))
+
+    # Check if opponent lacks counters to our win condition (hog rider)
+    context["opponent_lacks_hog_counter"] = float(
+        not opponent_tracker.has_counter("hog-rider")
+    )
 
     # Temporal stability factor
     context["stability"] = float(np.exp(-abs(embedding[6])))
@@ -252,6 +259,10 @@ class HybridStrategy:
         self._action_cache: Dict[str, Any] = {}
         self._strategic_memory: List[Dict[str, float]] = []
 
+        # Opponent tracking
+        self._opponent_tracker = OpponentTracker(initial_elixir=5)
+        self._game_start_time: Optional[float] = None
+
         self._ready = True
 
     def _load_dt_config(self) -> Dict[str, Any]:
@@ -308,6 +319,10 @@ class HybridStrategy:
         self._dt_inference_count = 0
         self._heuristic_count = 0
 
+        # Reset opponent tracking
+        self._opponent_tracker.reset()
+        self._game_start_time = None
+
         # Clear caches
         _EMBEDDING_CACHE.clear()
         _STRATEGIC_CONTEXT_CACHE.clear()
@@ -318,12 +333,22 @@ class HybridStrategy:
 
         start_time = time.time()
 
+        # Update opponent tracking
+        current_time = float(state.get("game_time_remaining", 180) or 180)
+        if self._game_start_time is None:
+            self._game_start_time = current_time
+
+        game_time_elapsed = max(0.0, self._game_start_time - current_time)
+        elixir_multiplier = int(state.get("elixir_multiplier", 1))
+
+        self._opponent_tracker.update_elixir(game_time_elapsed, elixir_multiplier)
+
         # Compute embedding from state
         embedding = _compute_dt_embedding(state, str(self._checkpoint_path))
         self._model_state["last_embedding"] = embedding
 
         # Extract strategic context
-        context = _extract_strategic_context(embedding, state)
+        context = _extract_strategic_context(embedding, state, self._opponent_tracker)
         self._strategic_memory.append(context)
 
         # Update context buffer (rolling window)
@@ -449,7 +474,7 @@ class HybridStrategy:
 
         # Extract strategic context from DT embedding
         embedding = _compute_dt_embedding(state, str(self._checkpoint_path))
-        context = _extract_strategic_context(embedding, state)
+        context = _extract_strategic_context(embedding, state, self._opponent_tracker)
 
         # Phase 2: Heuristic evaluation with DT context
         heuristic_actions = self._evaluate_heuristic_actions(state, context)
@@ -522,6 +547,15 @@ class HybridStrategy:
                 return affordable[0][0], GRID_COLS // 2, PLAYER_SIDE_MIN_ROW + 3
 
             return None
+
+        # Log opponent state for debugging
+        player_elixir = float(state.get("player_elixir", 0) or 0)
+        print(f"[HybridStrategy] {self._opponent_tracker.get_state_string()}")
+        print(
+            f"[HybridStrategy] Elixir Advantage: {self._opponent_tracker.get_elixir_advantage(player_elixir):.1f} | "
+            f"Aggression: {context['aggression_factor']:.2f} | "
+            f"Lacks Hog Counter: {bool(context['opponent_lacks_hog_counter'])}"
+        )
 
         # Record decision in model state for potential online learning
         if self._model_state.get("last_embedding") is not None:
