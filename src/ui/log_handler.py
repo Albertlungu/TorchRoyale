@@ -3,10 +3,12 @@ Log handler for displaying log messages in the GUI.
 """
 
 import logging
+from typing import Any
 
 from PyQt6.QtCore import Q_ARG
 from PyQt6.QtCore import QMetaObject
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTextEdit
 
 
 class QTextEditLogger(logging.Handler):
@@ -17,7 +19,7 @@ class QTextEditLogger(logging.Handler):
         text_edit (QTextEdit): The text widget to append log messages to.
     """
 
-    def __init__(self, text_edit) -> None:
+    def __init__(self, text_edit: QTextEdit) -> None:
         """
         Initialize the handler with a QTextEdit widget.
 
@@ -29,7 +31,7 @@ class QTextEditLogger(logging.Handler):
         super().__init__()
         self.text_edit = text_edit
 
-    def emit(self, record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         """
         Emit a log record to the text edit widget via queued connection.
 
@@ -38,7 +40,7 @@ class QTextEditLogger(logging.Handler):
         Returns:
             None
         """
-        log_entry = self.format(record)
+        log_entry: str = self.format(record)
         QMetaObject.invokeMethod(
             self.text_edit,
             "append",

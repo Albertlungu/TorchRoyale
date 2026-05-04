@@ -2,13 +2,15 @@
 Button animation effects for TorchRoyale GUI.
 """
 
+from typing import Any
+
 from PyQt6.QtCore import QEasingCurve
 from PyQt6.QtCore import QPropertyAnimation
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 
 
-def start_play_button_animation(window) -> None:
+def start_play_button_animation(window: Any) -> None:
     """
     Add a glowing effect animation to the start/stop button.
 
@@ -26,7 +28,7 @@ def start_play_button_animation(window) -> None:
     _start_glow_animation(window)
 
 
-def _start_glow_animation(window) -> None:
+def _start_glow_animation(window: Any) -> None:
     """
     Create and start the glow animation on the start/stop button.
 

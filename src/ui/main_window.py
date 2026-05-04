@@ -7,11 +7,17 @@ from typing import Dict
 from typing import Optional
 
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QCheckBox
+from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QDoubleSpinBox
+from PyQt6.QtWidgets import QLineEdit
 from PyQt6.QtWidgets import QMainWindow
+from PyQt6.QtWidgets import QTextEdit
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
 from src.ui.animations import start_play_button_animation
+from src.ui.gameplay_widget import ImageStreamWindow
 from src.ui.layout_setup import setup_tabs
 from src.ui.layout_setup import setup_top_bar
 from src.ui.styles import set_styles
@@ -29,6 +35,23 @@ class MainWindow(QMainWindow):
         bot_thread (Optional[Thread]): Thread running the bot.
         is_running (bool): Whether the bot is currently running.
         log_message (pyqtSignal): Signal for emitting log messages to the UI.
+
+        start_stop_button (QPushButton): Button to start or stop the bot.
+        play_pause_button (QPushButton): Button to pause or resume the bot.
+        server_id_label (QLabel): Label displaying the current bot status.
+        visualize_tab (ImageStreamWindow): Widget displaying live gameplay frames.
+        log_display (QTextEdit): Read-only text edit for runtime log messages.
+        dashboard_status_value (QLabel): Label showing bot status in the dashboard.
+        dashboard_visualizer_value (QLabel): Label showing visualizer state in dashboard.
+        adb_ip_input (QLineEdit): Input field for ADB IP address.
+        device_serial_input (QLineEdit): Input field for device serial.
+        log_level_dropdown (QComboBox): Dropdown for selecting log verbosity.
+        play_action_delay_input (QDoubleSpinBox): Input for action delay in seconds.
+        load_deck_checkbox (QCheckBox): Checkbox to load deck on startup.
+        auto_start_game_checkbox (QCheckBox): Checkbox to auto-start games.
+        show_images_checkbox (QCheckBox): Checkbox to enable live visualizer.
+        save_images_checkbox (QCheckBox): Checkbox to save annotated frames.
+        save_labels_checkbox (QCheckBox): Checkbox to save detector labels.
     """
 
     log_message = pyqtSignal(str)
@@ -66,8 +89,29 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(16)
 
-        top_bar = setup_top_bar(self)
-        tab_widget = setup_tabs(self)
+        (
+            top_bar,
+            self.start_stop_button,
+            self.play_pause_button,
+            self.server_id_label,
+        ) = setup_top_bar(self)
+
+        (
+            tab_widget,
+            self.visualize_tab,
+            self.log_display,
+            self.dashboard_status_value,
+            self.dashboard_visualizer_value,
+            self.adb_ip_input,
+            self.device_serial_input,
+            self.log_level_dropdown,
+            self.play_action_delay_input,
+            self.load_deck_checkbox,
+            self.auto_start_game_checkbox,
+            self.show_images_checkbox,
+            self.save_images_checkbox,
+            self.save_labels_checkbox,
+        ) = setup_tabs(self)
 
         main_layout.addWidget(top_bar)
         main_layout.addWidget(tab_widget)
@@ -100,8 +144,7 @@ class MainWindow(QMainWindow):
             "Live bot backend is not configured for TorchRoyale yet. "
             "UI controls are disabled."
         )
-        if hasattr(self, "dashboard_status_value"):
-            self.dashboard_status_value.setText("UI only")
+        self.dashboard_status_value.setText("UI only")
 
     def log_handler_function(self, message: str) -> None:
         """
@@ -186,8 +229,7 @@ class MainWindow(QMainWindow):
         self.start_stop_button.setText("Stop")
         self.play_pause_button.show()
         self.server_id_label.setText("Status: Running")
-        if hasattr(self, "dashboard_status_value"):
-            self.dashboard_status_value.setText("Running")
+        self.dashboard_status_value.setText("Running")
 
     def stop_bot(self) -> None:
         """
@@ -204,8 +246,7 @@ class MainWindow(QMainWindow):
         self.play_pause_button.setText("Pause")
         self.play_pause_button.hide()
         self.server_id_label.setText("Status: Stopped")
-        if hasattr(self, "dashboard_status_value"):
-            self.dashboard_status_value.setText("Stopped")
+        self.dashboard_status_value.setText("Stopped")
 
     def restart_bot(self) -> None:
         """
@@ -237,10 +278,9 @@ class MainWindow(QMainWindow):
         self.config["visuals"]["save_images"] = self.save_images_checkbox.isChecked()
         self.config["visuals"]["show_images"] = self.show_images_checkbox.isChecked()
         self.visualize_tab.update_active_state(self.config["visuals"]["show_images"])
-        if hasattr(self, "dashboard_visualizer_value"):
-            self.dashboard_visualizer_value.setText(
-                "On" if self.config["visuals"]["show_images"] else "Off"
-            )
+        self.dashboard_visualizer_value.setText(
+            "On" if self.config["visuals"]["show_images"] else "Off"
+        )
         self.config["bot"]["load_deck"] = self.load_deck_checkbox.isChecked()
         self.config["bot"]["auto_start_game"] = (
             self.auto_start_game_checkbox.isChecked()

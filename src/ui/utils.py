@@ -9,7 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "configs" / "app_config.yaml"
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, Any] = {
     "adb": {"ip": "127.0.0.1", "device_serial": ""},
     "bot": {
         "auto_start_game": False,
@@ -35,7 +35,7 @@ def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
     Returns:
         dict[str, Any]: Merged config with defaults filled in where missing.
     """
-    merged = {
+    merged: dict[str, Any] = {
         section: values.copy() if isinstance(values, dict) else values
         for section, values in DEFAULT_CONFIG.items()
     }
@@ -52,7 +52,7 @@ def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
 def load_config() -> dict[str, Any]:
     """
     Load UI config from `configs/app_config.yaml`.
-    
+
     Args:
         None
 
