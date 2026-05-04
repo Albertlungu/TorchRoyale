@@ -18,7 +18,18 @@ from src.ui.styles import set_styles
 
 
 class MainWindow(QMainWindow):
-    """Main application window for TorchRoyale."""
+    """
+    Main application window for TorchRoyale.
+
+    Attributes:
+        config (Dict[str, Any]): Application configuration dictionary.
+        actions (Optional[Any]): Action handlers for the bot (currently unused).
+        bot_factory (Optional[Callable[..., Any]]): Factory to create bot instances.
+        bot (Optional[Any]): The running bot instance.
+        bot_thread (Optional[Thread]): Thread running the bot.
+        is_running (bool): Whether the bot is currently running.
+        log_message (pyqtSignal): Signal for emitting log messages to the UI.
+    """
 
     log_message = pyqtSignal(str)
 
@@ -28,6 +39,16 @@ class MainWindow(QMainWindow):
         actions: Optional[Any] = None,
         bot_factory: Optional[Callable[..., Any]] = None,
     ) -> None:
+        """
+        Initialize the main window with config and optional bot factory.
+
+        Args:
+            config (Dict[str, Any]): Application configuration.
+            actions (Optional[Any]): Action handlers (unused, kept for compatibility).
+            bot_factory (Optional[Callable[..., Any]]): Factory to create bot instances.
+        Returns:
+            None
+        """
         super().__init__()
         self.config = config
         self.actions = actions
@@ -57,7 +78,15 @@ class MainWindow(QMainWindow):
         self._configure_runtime_state()
 
     def _configure_runtime_state(self) -> None:
-        """Reflect whether a live bot backend is available in this session."""
+        """
+        Reflect whether a live bot backend is available in this session.
+
+        Disables UI controls and shows "UI only" status if no bot factory is provided.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.bot_factory is not None:
             return
 
@@ -75,14 +104,40 @@ class MainWindow(QMainWindow):
             self.dashboard_status_value.setText("UI only")
 
     def log_handler_function(self, message: str) -> None:
+        """
+        Emit a log message to be displayed in the UI.
+
+        Args:
+            message (str): The log message to emit.
+        Returns:
+            None
+        """
         self.log_message.emit(message)
 
     def _append_log_message(self, formatted_message: str) -> None:
+        """
+        Append a formatted log message to the runtime log display.
+
+        Args:
+            formatted_message (str): The formatted message to append.
+        Returns:
+            None
+        """
         self.log_display.append(formatted_message)
         scrollbar = self.log_display.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
     def toggle_start_stop(self) -> None:
+        """
+        Toggle the bot between started and stopped states.
+
+        If running, stops the bot and restarts the glow animation.
+        If stopped, starts the bot and stops the glow animation.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.is_running:
             self.stop_bot()
             self.glow_animation.start()
@@ -91,6 +146,15 @@ class MainWindow(QMainWindow):
             self.glow_animation.stop()
 
     def toggle_pause_resume_and_display(self) -> None:
+        """
+        Toggle the bot between paused and resumed states.
+
+        Updates the button text between "Pause" and "Resume" accordingly.
+        Args:
+            None
+        Returns:
+            None
+        """
         if not self.bot or not hasattr(self.bot, "pause_or_resume"):
             return
         pause_event = getattr(self.bot, "pause_event", None)
@@ -101,6 +165,15 @@ class MainWindow(QMainWindow):
         self.bot.pause_or_resume()
 
     def start_bot(self) -> None:
+        """
+        Start the bot in a separate daemon thread.
+
+        Updates UI controls to reflect running state.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.is_running:
             return
         if self.bot_factory is None:
@@ -117,6 +190,13 @@ class MainWindow(QMainWindow):
             self.dashboard_status_value.setText("Running")
 
     def stop_bot(self) -> None:
+        """
+        Stop the running bot and update UI controls to reflect stopped state.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.bot and hasattr(self.bot, "stop"):
             self.bot.stop()
         self.is_running = False
@@ -128,12 +208,26 @@ class MainWindow(QMainWindow):
             self.dashboard_status_value.setText("Stopped")
 
     def restart_bot(self) -> None:
+        """
+        Restart the bot by stopping it then starting it again with current config.
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.is_running:
             self.stop_bot()
         self.update_config()
         self.start_bot()
 
     def update_config(self) -> Dict[str, Any]:
+        """
+        Update the config dictionary from current UI widget values.
+        Args:
+            None
+        Returns:
+            Dict[str, Any]: The updated configuration dictionary.
+        """
         self.config.setdefault("visuals", {})
         self.config.setdefault("bot", {})
         self.config.setdefault("ingame", {})
@@ -160,6 +254,13 @@ class MainWindow(QMainWindow):
         return self.config
 
     def _build_bot_instance(self) -> Any:
+        """
+        Build a bot instance using the bot factory.
+        Args:
+            None
+        Returns:
+            Any: The created bot instance.
+        """
         try:
             return self.bot_factory(
                 actions=self.actions,
@@ -170,6 +271,16 @@ class MainWindow(QMainWindow):
             return self.bot_factory(self.actions, self.config)
 
     def bot_task(self) -> None:
+        """
+        Run the bot task in a separate thread.
+
+        Connects frame signals to the visualizer and runs the bot.
+        Handles exceptions and ensures bot stops on completion.
+        Args:
+            None
+        Returns:
+            None
+        """
         try:
             self.bot = self._build_bot_instance()
             visualizer = getattr(self.bot, "visualizer", None)
@@ -183,4 +294,12 @@ class MainWindow(QMainWindow):
             self.stop_bot()
 
     def append_log(self, message: str) -> None:
-        self.log_display.append(message)
+        """
+        Append a log message to the runtime log display.
+
+        Args:
+            message (str): The message to append.
+        Returns:
+            None
+        """
+        self.log_display.append(message)    

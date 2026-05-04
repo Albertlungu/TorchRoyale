@@ -27,11 +27,22 @@ from src.ui.utils import save_config
 
 
 def _wrap_section(title: str, description: str, widget: QWidget) -> QFrame:
+    """
+    Wrap a widget in a styled section card with title and description.
+
+    Args:
+        title (str): The section title displayed at the top.
+        description (str): Optional description text below the title.
+        widget (QWidget): The widget to embed inside the section.
+
+    Returns:
+        QFrame: A styled frame containing the title, description, and widget.
+    """
     section = QFrame()
     section.setObjectName("sectionCard")
     layout = QVBoxLayout(section)
     layout.setContentsMargins(18, 18, 18, 18)
-    layout.setSpacing(12)
+    layout.setSpacing(0)
 
     title_label = QLabel(title)
     title_label.setObjectName("sectionTitle")
@@ -48,6 +59,16 @@ def _wrap_section(title: str, description: str, widget: QWidget) -> QFrame:
 
 
 def _make_read_only_field(label_text: str, value_widget: QWidget) -> QWidget:
+    """
+    Create a read-only field with a label and value widget.
+
+    Args:
+        label_text (str): The label text displayed above the value.
+        value_widget (QWidget): The widget displaying the value (e.g., QLabel).
+
+    Returns:
+        QWidget: A container widget with label and value arranged vertically.
+    """
     container = QWidget()
     layout = QVBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -61,7 +82,15 @@ def _make_read_only_field(label_text: str, value_widget: QWidget) -> QWidget:
 
 
 def setup_top_bar(main_window) -> QFrame:
-    """Create the top bar with title, status, and transport controls."""
+    """
+    Create the top bar with title, status, and transport controls.
+
+    Args:
+        main_window (MainWindow): The main window instance to attach controls to.
+
+    Returns:
+        QFrame: The configured top bar widget with title, status, and buttons.
+    """
     top_bar = QFrame()
     top_bar.setObjectName("topBar")
     top_bar_layout = QHBoxLayout(top_bar)
@@ -112,6 +141,15 @@ def setup_top_bar(main_window) -> QFrame:
 
 
 def _build_dashboard_tab(main_window) -> QWidget:
+    """
+    Build the Dashboard tab with live overlay, quick controls, and runtime log.
+
+    Args:
+        main_window (MainWindow): The main window instance to attach widgets to.
+
+    Returns:
+        QWidget: The configured Dashboard tab widget.
+    """
     dashboard = QWidget()
     dashboard_layout = QGridLayout(dashboard)
     dashboard_layout.setContentsMargins(0, 0, 0, 0)
@@ -180,6 +218,15 @@ def _build_dashboard_tab(main_window) -> QWidget:
 
 
 def _build_settings_tab(main_window) -> QWidget:
+    """
+    Build the Settings tab with connection, runtime, visualizer, and persistence sections.
+
+    Args:
+        main_window (MainWindow): The main window instance to attach widgets to.
+
+    Returns:
+        QWidget: The configured Settings tab widget with scrollable content.
+    """
     settings_tab = QWidget()
     outer_layout = QVBoxLayout(settings_tab)
     outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -320,7 +367,15 @@ def _build_settings_tab(main_window) -> QWidget:
 
 
 def setup_tabs(main_window) -> QTabWidget:
-    """Create the simplified dashboard and settings tabs."""
+    """
+    Create the simplified dashboard and settings tabs.
+
+    Args:
+        main_window (MainWindow): The main window instance to attach tabs to.
+
+    Returns:
+        QTabWidget: A tab widget containing Dashboard and Settings tabs.
+    """
     tab_widget = QTabWidget()
     tab_widget.addTab(_build_dashboard_tab(main_window), "Dashboard")
     tab_widget.addTab(_build_settings_tab(main_window), "Settings")

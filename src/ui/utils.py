@@ -26,6 +26,15 @@ DEFAULT_CONFIG = {
 
 
 def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Merge user config with default config values.
+
+    Args:
+        config (Optional[dict[str, Any]]): User-provided config to merge (may be None).
+
+    Returns:
+        dict[str, Any]: Merged config with defaults filled in where missing.
+    """
     merged = {
         section: values.copy() if isinstance(values, dict) else values
         for section, values in DEFAULT_CONFIG.items()
@@ -41,7 +50,15 @@ def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
 
 
 def load_config() -> dict[str, Any]:
-    """Load UI config from `configs/app_config.yaml`."""
+    """
+    Load UI config from `configs/app_config.yaml`.
+    
+    Args:
+        None
+
+    Returns:
+        dict[str, Any]: Configuration dictionary with defaults merged in.
+    """
     if not CONFIG_PATH.exists():
         return _merge_defaults(None)
     with CONFIG_PATH.open(encoding="utf-8") as file:
@@ -49,7 +66,14 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(config: dict[str, Any]) -> None:
-    """Persist UI config to `configs/app_config.yaml`."""
+    """
+    Persist UI config to `configs/app_config.yaml`.
+
+    Args:
+        config (dict[str, Any]): Configuration dictionary to save.
+    Returns:
+        None
+    """
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with CONFIG_PATH.open("w", encoding="utf-8") as file:
         yaml.safe_dump(_merge_defaults(config), file, sort_keys=True)

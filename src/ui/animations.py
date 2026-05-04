@@ -9,7 +9,14 @@ from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 
 
 def start_play_button_animation(window) -> None:
-    """Add a glowing effect animation to the start/stop button."""
+    """
+    Add a glowing effect animation to the start/stop button.
+
+    Args:
+        window (MainWindow): The main window containing the start/stop button.
+    Returns:
+        None
+    """
     window.glow_effect = QGraphicsDropShadowEffect(window)
     window.glow_effect.setBlurRadius(10)
     window.glow_effect.setColor(Qt.GlobalColor.cyan)
@@ -20,7 +27,14 @@ def start_play_button_animation(window) -> None:
 
 
 def _start_glow_animation(window) -> None:
-    """Create and start the glow animation."""
+    """
+    Create and start the glow animation on the start/stop button.
+
+    Args:
+        window (MainWindow): The main window containing the glow effect.
+    Returns:
+        None
+    """
     window.glow_animation = QPropertyAnimation(
         window.glow_effect, b"blurRadius"
     )
