@@ -170,8 +170,16 @@ class OpponentTracker:
 
     def _get_counters_for(self, card: str) -> List[str]:
         """Get list of cards that counter the given card."""
-        # Basic counter mappings for Hog 2.6 deck
-        counters = {
+        # Load from counters.json if available
+        counters_path = Path(__file__).parents[2] / "data" / "counters.json"
+        if counters_path.exists():
+            with open(counters_path, "r") as f:
+                counters_data = json.load(f)
+                card_data = counters_data.get(card.lower(), {})
+                return card_data.get("counters", [])
+
+        # Fallback basic mappings
+        fallback = {
             "hog-rider": [
                 "cannon",
                 "tesla",
@@ -186,8 +194,65 @@ class OpponentTracker:
             "ice-golem": ["knight", "mini-pekka", "musketeer"],
             "cannon": ["lightning", "earthquake", "fireball"],
         }
+        return fallback.get(card.lower(), [])
 
-        return counters.get(card.lower(), [])
+    def can_we_counter_their_counter(self, our_hand: List[str], our_card: str) -> bool:
+        """
+        Check if we have a counter to their counter of our card.
+
+        Args:
+            our_hand: Our current hand cards
+            our_card: The card we want to play (e.g., "hog-rider")
+
+        Returns:
+            True if we can counter their counter
+        """
+        if not self.hand or not any(self.hand):
+            return False
+
+        # Get counters they have in hand for our card
+        their_potential_counters = []
+        for hand_card in self.hand:
+            if hand_card and hand_card.lower() in self._get_counters_for(our_card):
+                their_potential_counters.append(hand_card.lower())
+
+        if not their_potential_counters:
+            return False  # They don't have counters
+
+        # Check if we have counters to THEIR counters
+        counters_path = Path(__file__).parents[2] / "data" / "counters.json"
+        if counters_path.exists():
+            with open(counters_path, "r") as f:
+                counters_data = json.load(f)
+
+            for their_counter in their_potential_counters:
+                # Get counter-to-counter data for their card
+                if their_counter in counters_data:
+                    counter_to_counter = counters_data[their_counter].get(
+                        "counter_to_counter", {}
+                    )
+
+                    # Check each of our hand cards
+                    for our_hand_card in our_hand:
+                        if our_hand_card:
+                            # Normalize our card name
+                            our_card_norm = our_hand_card.lower().replace(
+                                "-in-hand", ""
+                            )
+
+                            # Check if our card counters their counter
+                            for (
+                                their_counter_key,
+                                our_counters,
+                            ) in counter_to_counter.items():
+                                if (
+                                    their_counter_key == their_counter
+                                    and our_card_norm
+                                    in [c.lower() for c in our_counters]
+                                ):
+                                    return True
+
+        return False
 
     def get_state_string(self) -> str:
         """Get formatted state for debugging/console output."""

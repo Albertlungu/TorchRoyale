@@ -1,96 +1,96 @@
 {
-  "Hog Rider": {
+  "hog-rider": {
     "counters": [
-      "Cannon",
-      "Tesla",
-      "Inferno Tower",
-      "Bomb Tower",
-      "Goblin Cage",
-      "Tombstone",
-      "Barbarians",
-      "Mini P.E.K.K.A",
-      "Tornado"
+      "cannon",
+      "tesla",
+      "inferno-tower",
+      "bomb-tower",
+      "goblin-cage",
+      "tombstone",
+      "mini-pekka",
+      "barbarians"
     ],
-    "counter_to_counter": [
-      "Fireball (destroy or weaken buildings/Barbarians)",
-      "Earthquake (if variant deck)",
-      "Log (clear swarm like Tombstone)",
-      "Ice Golem (kite/support vs Mini P.E.K.K.A)",
-      "Prediction Fireball/Log"
-    ]
+    "counter_to_counter": {
+      "cannon": ["fireball", "earthquake"],
+      "tesla": ["fireball", "earthquake"],
+      "inferno-tower": ["earthquake", "lightning"],
+      "bomb-tower": ["fireball", "earthquake"],
+      "goblin-cage": ["fireball", "log"],
+      "tombstone": ["log", "fireball"],
+      "mini-pekka": ["skeletons", "ice-spirit", "ice-golem"],
+      "barbarians": ["fireball", "log"]
+    }
   },
-  "Musketeer": {
+  "musketeer": {
     "counters": [
-      "Fireball",
-      "Lightning",
-      "Poison",
-      "Rocket",
-      "Mini tanks (Knight, Valkyrie)",
-      "Swarm (Minions, Skeleton Army)"
+      "fireball",
+      "lightning",
+      "poison",
+      "rocket",
+      "knight",
+      "valkyrie",
+      "minions",
+      "skeleton-army"
     ],
-    "counter_to_counter": [
-      "Spread troops (avoid spell value)",
-      "Ice Golem (tank for Musketeer)",
-      "Log (clear swarm)",
-      "Fireball (punish grouped counters)"
-    ]
+    "counter_to_counter": {
+      "fireball": [],
+      "lightning": [],
+      "poison": [],
+      "rocket": [],
+      "knight": ["musketeer", "skeletons", "ice-spirit"],
+      "valkyrie": ["musketeer", "minions"],
+      "minions": ["ice-spirit", "fireball"],
+      "skeleton-army": ["log", "fireball"]
+    }
   },
-  "Cannon": {
-    "counters": [
-      "Lightning",
-      "Earthquake",
-      "Fireball (chip)",
-      "Tank + support pushes"
-    ],
-    "counter_to_counter": [
-      "Cycle quickly to another Cannon",
-      "Use Musketeer for support defense",
-      "Ice Golem to kite tanks",
-      "Pressure opposite lane with Hog"
-    ]
+  "cannon": {
+    "counters": ["lightning", "earthquake", "fireball", "tank+support"],
+    "counter_to_counter": {
+      "lightning": [],
+      "earthquake": [],
+      "fireball": [],
+      "tank+support": ["cannon", "musketeer"]
+    }
   },
-  "Ice Golem": {
-    "counters": [
-      "Any DPS troop",
-      "Air troops (ignore it)",
-      "Buildings (stall)"
-    ],
-    "counter_to_counter": [
-      "Use death damage to clear swarms",
-      "Pair with Hog Rider",
-      "Kite units into Musketeer/Cannon range"
-    ]
+  "ice-golem": {
+    "counters": ["knight", "mini-pekka", "musketeer", "any-dps"],
+    "counter_to_counter": {
+      "knight": ["musketeer", "skeletons"],
+      "mini-pekka": ["skeletons", "ice-spirit"],
+      "musketeer": ["fireball"],
+      "any-dps": ["ice-golem-kite"]
+    }
   },
-  "Skeletons": {
-    "counters": ["Log", "Zap", "Arrows", "Splash units"],
-    "counter_to_counter": [
-      "Bait small spells",
-      "Outcycle opponent’s spells",
-      "Use as distraction after spell is used"
-    ]
+  "skeletons": {
+    "counters": ["log", "zap", "arrows", "splash"],
+    "counter_to_counter": {
+      "log": ["bait", "outcycle"],
+      "zap": ["bait", "outcycle"],
+      "arrows": ["bait", "outcycle"],
+      "splash": ["ice-golem", "hog-rider-pressure"]
+    }
   },
-  "Ice Spirit": {
-    "counters": ["Any troop", "Spells"],
-    "counter_to_counter": [
-      "Cycle quickly",
-      "Use for freeze timing with Hog",
-      "Force inefficient responses"
-    ]
+  "ice-spirit": {
+    "counters": ["any-troop", "spells"],
+    "counter_to_counter": {
+      "any-troop": ["cycle"],
+      "spells": ["cycle", "force-inefficient-response"]
+    }
   },
-  "Fireball": {
-    "counters": ["Spread troops", "High HP units", "Spell bait decks"],
-    "counter_to_counter": [
-      "Predict troop placement",
-      "Pair with Log for extra value",
-      "Use on towers when no value targets"
-    ]
+  "fireball": {
+    "counters": ["spread", "high-hp", "bait"],
+    "counter_to_counter": {
+      "spread": ["prediction"],
+      "high-hp": ["musketeer", "hog-rider"],
+      "bait": ["outcycle", "pressure"]
+    }
   },
-  "The Log": {
-    "counters": ["Air troops", "Spread placement", "High HP ground troops"],
-    "counter_to_counter": [
-      "Save for key swarm units",
-      "Combine with Fireball",
-      "Outcycle opponent’s bait cards"
-    ]
+  "the-log": {
+    "counters": ["air", "spread", "high-hp-ground"],
+    "counter_to_counter": {
+      "air": ["musketeer", "minions"],
+      "spread": ["prediction"],
+      "high-hp-ground": ["musketeer", "cannon"]
+    }
   }
 }
