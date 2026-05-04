@@ -42,6 +42,8 @@ class MainWindow(QMainWindow):
         main_widget = QWidget(self)
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(16)
 
         top_bar = setup_top_bar(self)
         tab_widget = setup_tabs(self)

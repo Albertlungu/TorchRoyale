@@ -65,7 +65,7 @@ def setup_top_bar(main_window) -> QFrame:
     top_bar = QFrame()
     top_bar.setObjectName("topBar")
     top_bar_layout = QHBoxLayout(top_bar)
-    top_bar_layout.setContentsMargins(24, 18, 24, 18)
+    top_bar_layout.setContentsMargins(20, 18, 20, 18)
     top_bar_layout.setSpacing(18)
 
     text_layout = QVBoxLayout()
@@ -114,7 +114,7 @@ def setup_top_bar(main_window) -> QFrame:
 def _build_dashboard_tab(main_window) -> QWidget:
     dashboard = QWidget()
     dashboard_layout = QGridLayout(dashboard)
-    dashboard_layout.setContentsMargins(20, 20, 20, 20)
+    dashboard_layout.setContentsMargins(0, 0, 0, 0)
     dashboard_layout.setHorizontalSpacing(16)
     dashboard_layout.setVerticalSpacing(16)
 
@@ -190,7 +190,7 @@ def _build_settings_tab(main_window) -> QWidget:
 
     content = QWidget()
     settings_layout = QGridLayout(content)
-    settings_layout.setContentsMargins(20, 20, 20, 20)
+    settings_layout.setContentsMargins(0, 0, 0, 0)
     settings_layout.setHorizontalSpacing(16)
     settings_layout.setVerticalSpacing(16)
 

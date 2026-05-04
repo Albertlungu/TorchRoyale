@@ -1,5 +1,5 @@
 adb:
-  device_serial: ""
+  device_serial: ''
   ip: 127.0.0.1
 bot:
   auto_start_game: false
@@ -19,4 +19,4 @@ ingame:
 visuals:
   save_images: false
   save_labels: false
-  show_images: false
+  show_images: true

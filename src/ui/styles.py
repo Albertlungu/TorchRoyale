@@ -19,7 +19,7 @@ def set_styles(window) -> None:
         }
 
         QFrame#topBar {
-            background-color: #181825;
+            background-color: #11111b;
             border: 1px solid #313244;
             border-radius: 18px;
         }
@@ -42,7 +42,7 @@ def set_styles(window) -> None:
 
         QTabWidget::pane {
             border: none;
-            top: 8px;
+            margin: 0;
         }
 
         QTabBar::tab {
