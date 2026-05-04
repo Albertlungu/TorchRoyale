@@ -2,6 +2,16 @@
 
 A complete machine learning pipeline for training a Decision Transformer model to play Clash Royale. The system analyzes gameplay videos, detects cards and units in real-time, tracks hand state across frames, and generates training episodes for a causal transformer model.
 
+## Model Architecture
+
+TorchRoyale implements a **Decision Transformer-first architecture with Heuristic Strategy augmentation** that leverages learned representations enhanced by domain-specific rules:
+
+- **Decision Transformer (Primary)**: The core decision-making engine that learns long-term strategic patterns and game state representations from replay data. The DT processes game state through a GPT-style transformer architecture to predict optimal card placements.
+- **Heuristic Strategy (Secondary)**: Provides tactical refinement and validation layer that ensures DT recommendations respect game constraints and domain expertise. Heuristics act as a safety and optimization layer rather than primary decision-maker.
+- **Integration**: The DT generates strategic embeddings that inform heuristic parameters, creating a context-aware scoring system. The final decision weights DT predictions at 70-80% with heuristic refinement at 20-30%.
+
+This architecture prioritizes learned strategic patterns while using heuristics for tactical validation, providing both intelligence and reliability.
+
 ## YOLO26 Windows Training
 
 For the Roboflow Universe project `stuff-j62hv/clash-royale-all-enemy-cards`, use the single-entry Windows script:
@@ -39,12 +49,46 @@ graph LR
     A[Replay Videos] --> B[Frame Analysis]
     B --> C[Episode Generation]
     C --> D[Model Training]
+    D --> E[Hybrid Strategy System]
     
     A -->|.mp4 files| B
     B -->|JSON state per frame| C
     C -->|Trajectory collections| D
-    D -->|Decision Transformer| E[Trained Model]
+    D -->|Decision Transformer + Heuristics| E
+    E -->|Ensemble decisions| F[Trained Model]
 ```
+
+### Model Integration
+
+The Decision Transformer-first architecture operates as follows:
+
+1. **Training Phase**: The Decision Transformer learns strategic patterns from 100+ replay episodes. The model is trained on trajectory data extracted from analyzed replays using supervised learning on expert demonstrations.
+
+2. **Inference Phase**: During live gameplay or replay analysis, the system:
+   - **Phase 1 (DT Inference)**: The Decision Transformer processes game state through its transformer architecture to generate strategic embeddings and card placement predictions
+   - **Phase 2 (Context Extraction)**: Strategic embeddings are converted to tactical parameters (aggression factor, defensive weight, elixir conservatism) that inform heuristic scoring
+   - **Phase 3 (Heuristic Refinement)**: Heuristic action classes score placements using DT-provided context, ensuring recommendations respect game constraints
+   - **Phase 4 (Ensemble Fusion)**: Final decision combines DT prediction (70% weight) with heuristic validation (30% weight) using dynamic weighting based on model confidence
+
+3. **Heuristic Components**: Eight specialized action classes provide tactical refinement for the DT's strategic recommendations:
+   - **ArchersAction**: Defensive placement behind towers
+   - **ArrowsAction**: Spell targeting for maximum enemy unit value
+   - **FireballAction**: High-value spell placement with radius optimization  
+   - **GiantAction**: Tank placement at bridge for pressure
+   - **KnightAction**: Defensive troop placement
+   - **MinionsAction**: Air troop deployment over enemies
+   - **MinipekkaAction**: Bridge pressure unit
+   - **MusketeerAction**: Ranged unit placement for optimal targeting
+
+Each heuristic evaluates placement quality based on enemy positions, elixir state, and tower health, but operates within the strategic context provided by the DT model. The heuristics act as a "reality check" and optimization layer rather than independent decision-makers.
+
+### Limitations
+
+- **DT Training Data**: The Decision Transformer requires significant training data (100+ replays) to learn effective strategies. Performance improves substantially with 200-500 replays.
+- **Heuristic Coverage**: While the DT handles all cards, heuristic refinement is currently optimized for 8 core cards (Hog 2.6 deck). Additional cards receive DT predictions without full heuristic validation.
+- **Detection Quality**: On-field detection accuracy depends on video quality and can be affected by visual effects, emotes, or overlays. This impacts both DT and heuristic performance.
+- **Real-time Performance**: DT inference runs at ~5-10 FPS on CPU. The hybrid system uses frame skipping and caching to maintain real-time performance.
+- **Hand Classification**: Card classification accuracy is ~95% but can be confused by evolution indicators or low-light conditions, affecting input quality to the DT model.
 
 ### Three-Layer Pipeline
 
@@ -62,13 +106,25 @@ graph TD
         AL1 -->|JSON output| Result[Per-frame State]
     end
     
+    subgraph Strategy Layer
+        SL1[Decision Transformer] -->|strategic embeddings| SL2[Strategic Context Generator]
+        SL2 -->|tactical parameters| SL3[Heuristic Ensemble]
+        SL3 -->|context-aware scoring| SL4[Decision Fusion]
+        SL4 -->|weighted ensemble| Decisions[Final Recommendations]
+    end
+    
     subgraph Training Layer
-        TL1[Feature Encoder] -->|33-dim vectors| TL2[Decision Transformer]
-        TL2 -->|trained model| TL3[Checkpoints]
+        TL1[Feature Encoder] -->|33-dim state vectors| TL2[Decision Transformer]
+        TL2 -->|strategic model| TL3[Model Checkpoints]
+        Result -->|training data| TL1
+        Decisions -->|online learning| TL2
+    end
+    
+    TL3 -->|loads into| SL1feedback loop| TL1
     end
     
     Output --> AL1
-    Result -->|JSON files| TL1
+    SL2 -->|uses| TL3[Trained DT Checkpoints]
 ```
 
 1. **Detection Layer** (`src/detection/`)
@@ -81,10 +137,17 @@ graph TD
    - Applies post-processing rules (hero musketeer substitution, evolution labeling)
    - Outputs per-frame state JSON with detections, hand cards, timers, elixir
 
-3. **Training Layer** (`src/transformer/`)
-   - Feature encoder: Converts frame state to fixed-length vectors
-   - Decision Transformer: GPT-style causal transformer predicting card + placement
-   - Training loop with validation and checkpoint saving
+3. **Strategy Layer** (`src/recommendation/`)
+   - **HybridStrategy**: Ensemble system combining DT predictions with heuristic refinement
+   - **Strategic Context Generator**: Converts DT embeddings to tactical parameters
+   - **Decision Fusion**: Dynamically weights DT vs heuristic signals based on confidence
+   - **Safety Validator**: Ensures final recommendations meet game constraints
+
+4. **Training Layer** (`src/transformer/`)
+   - Feature encoder: Converts frame state to 33-dim vectors for DT input
+   - Decision Transformer: GPT-style causal transformer with 128-dim embeddings
+   - Hybrid training loop: Trains DT on replay data while heuristics provide validation
+   - Checkpoint system: Saves model state with strategic context for inference
 
 ---
 
@@ -97,6 +160,7 @@ graph TD
 Replaces KataCRDetector with a dedicated dual-model architecture:
 - **Cicadas model**: Detects PLAYER'S cards (Hog 2.6 deck: cannon, fireball, hog_rider, ice_golem, ice_spirit, log, musketeer, skeletons, evo_ice_spirit, evo_skeletons)
 - **Vision Bot model**: Detects OPPONENT'S cards (all cards in the game)
+- **Integration**: Detection results feed directly into both DT feature encoder and heuristic scoring
 
 **Key features:**
 - Model assignment determines ownership directly (is_opponent flag)
@@ -130,23 +194,26 @@ The detector auto-calibrates by scanning a mid-game frame (10% into video) to fi
 
 #### HandClassifier (`src/detection/hand_classifier.py`)
 
-YOLOv8 classification model that identifies cards in four hand slots.
+YOLOv8 classification model that identifies cards in four hand slots. **Updated to use the superior `data/models/hand_classifier` weights** for improved accuracy.
 
 **Layout:**
-- Crops vertical strip: 84.5%–96.5% of frame height
+- Crops vertical strip: 82.4%–94.5% of frame height  
 - Divides into 5 sections: "next card" preview + 4 hand slots
 - Applies per-slot horizontal offsets (calibrated for 1920×1080, scaled to any resolution)
+- **Improved accuracy**: ~95% classification accuracy with better evolution detection
 
 **Output normalization:**
 
 Raw classifier output is normalized to pipeline canonical format:
 - Spaces → dashes: `"ice spirit"` → `"ice-spirit"`
 - Plural → singular: `"skeletons"` → `"skeleton"`
-- "evo " prefix → "-evolution" suffix: `"evo ice spirit"` → `"ice-spirit-evolution"`
+- "evo "  prefix → "-evolution" suffix: `"evo ice spirit"` → `"ice-spirit-evolution"`
 
 This ensures downstream consumers (vocabulary lookup, hand tracker) see consistent names.
 
 **Confidence threshold:** 0.40 (returns None for lower confidence)
+
+**Upgrade path**: The classifier now uses `data/models/hand_classifier/hand_classifier.pt` which provides significantly better performance than previous versions, especially for evolved cards and in low-light conditions.
 
 #### HandTracker (`src/detection/hand_tracker.py`)
 
