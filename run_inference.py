@@ -1,48 +1,48 @@
 #!/usr/bin/env python3
 """
-Quick script to run inference on a replay video.
+Run DT inference on a replay video using a pre-computed analysis JSON.
+
+Produces a JSONL recommendations file that can be visualised with view_replay.py.
 
 Usage:
-    python3 run_inference.py <video_path> [--frame-skip SKIP] [--checkpoint PATH]
+  python run_inference.py data/replays/Game\\ 1.mov --checkpoint data/models/dt/best.pt
 """
+from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 from src.overlay.inference_runner import InferenceRunner
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run DT inference on replay video")
-    parser.add_argument("video", help="Path to video file")
-    parser.add_argument("--frame-skip", type=int, default=6, help="Frame skip (default: 6)")
-    parser.add_argument("--checkpoint", default="output/models/best.pt", help="Model checkpoint")
-    parser.add_argument("--output", help="Output JSONL path (default: auto-generated)")
+def main() -> None:
+    """Parse arguments and run the inference pass."""
+    parser = argparse.ArgumentParser(
+        description="Run Decision Transformer inference on a cached replay analysis."
+    )
+    parser.add_argument("video", help="Path to the replay video.")
+    parser.add_argument("--checkpoint", default="data/models/dt/best.pt")
+    parser.add_argument("--output", default=None)
+    parser.add_argument("--analysis-dir", default="output/analysis")
+    parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
 
-    video_path = Path(args.video)
-    if not video_path.exists():
-        print(f"ERROR: Video not found: {video_path}")
-        return 1
+    video = Path(args.video)
+    output: str = args.output or f"output/replay_runs/{video.stem}_recommendations.jsonl"
 
-    output_path = args.output or f"output/replay_runs/{video_path.stem}_recommendations.jsonl"
-
-    print(f"Video: {video_path}")
+    print(f"Video:      {video}")
     print(f"Checkpoint: {args.checkpoint}")
-    print(f"Frame skip: {args.frame_skip}")
-    print(f"Output: {output_path}")
+    print(f"Output:     {output}")
     print()
 
     runner = InferenceRunner(
-        video_path=str(video_path),
+        video_path=str(video),
         checkpoint_path=args.checkpoint,
-        output_jsonl=output_path,
-        analysis_output_dir="output/analysis",
-        frame_skip=args.frame_skip,
+        output_jsonl=output,
+        analysis_dir=args.analysis_dir,
+        device=args.device,
     )
-
-    result_path = runner.run()
-    print(f"\nDone! Recommendations written to: {result_path}")
-    return 0
+    runner.run()
 
 
 if __name__ == "__main__":

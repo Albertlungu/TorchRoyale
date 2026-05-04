@@ -1,5 +1,7 @@
 """Side classifier for distinguishing ally and enemy units."""
 
+from __future__ import annotations
+
 import numpy as np
 from PIL import Image
 
@@ -18,9 +20,6 @@ class SideDetector(OnnxDetector):
         array = np.array(image, dtype=np.float32) / 255.0
         return np.expand_dims(array, axis=0)
 
-    @staticmethod
-    def _post_process(prediction: np.ndarray) -> str:
-        return ("ally", "enemy")[int(np.argmax(prediction[0]))]
-
     def run(self, image: Image.Image) -> str:
-        return self._post_process(self._infer(self._preprocess(image)))
+        prediction = self._infer(self._preprocess(image))
+        return ("ally", "enemy")[int(np.argmax(prediction[0]))]

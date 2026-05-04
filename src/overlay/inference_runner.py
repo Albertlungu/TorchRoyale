@@ -1,30 +1,30 @@
 """
-Processes a replay video through the full pipeline and writes per-frame
-recommendations to a JSONL file.
+InferenceRunner: loads a cached analysis JSON and runs the DT on each frame,
+producing a JSONL recommendations file for the overlay.
 
-Each line is one of:
-  {"timestamp_ms": ..., "player_elixir": ..., "has_recommendation": true,
-   "card": "...", "tile_x": ..., "tile_y": ..., "elixir_required": ...}
-  {"timestamp_ms": ..., "player_elixir": ..., "has_recommendation": false}
+The runner expects the analysis JSON to already exist (produced by VideoAnalyzer).
+If the file is absent it raises FileNotFoundError rather than re-running analysis.
+
+Public API:
+  InferenceRunner -- construct with paths, call run() to produce the JSONL file
 """
+from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
-from typing import Optional
+from typing import List
 
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.video.video_analyzer import VideoAnalyzer
+from src.constants.cards import elixir_cost
 from src.recommendation.strategy import DTStrategy
-from src.constants.game_constants import get_elixir_cost
+from src.types import FrameDict, RecommendationDict
 
 
 class InferenceRunner:
     """
-    Runs VideoAnalyzer + DTStrategy on a replay video and writes a JSONL
-    recommendation log that the overlay can read.
+    Offline inference pass over a pre-computed analysis JSON.
+
+    For each frame in the analysis, the Decision Transformer predicts a card
+    placement. Results are written one-per-line as JSON (JSONL format).
     """
 
     def __init__(
@@ -32,95 +32,82 @@ class InferenceRunner:
         video_path: str,
         checkpoint_path: str,
         output_jsonl: str,
-        analysis_output_dir: str = "output/analysis",
-        frame_skip: int = 6,
-    ):
+        analysis_dir: str = "output/analysis",
+        device: str = "cpu",
+    ) -> None:
+        """
+        Args:
+            video_path:      path to the source replay video (used to locate the analysis JSON).
+            checkpoint_path: path to the DT model checkpoint.
+            output_jsonl:    path where the JSONL output will be written.
+            analysis_dir:    directory containing <stem>_analysis.json files.
+            device:          PyTorch device for the model.
+        """
         self._video_path = video_path
-        self._checkpoint_path = checkpoint_path
-        self._output_jsonl = Path(output_jsonl)
-        self._analysis_output_dir = analysis_output_dir
-        self._frame_skip = frame_skip
+        self._checkpoint = checkpoint_path
+        self._output = Path(output_jsonl)
+        self._analysis_dir = Path(analysis_dir)
+        self._device = device
 
     def run(self) -> Path:
         """
-        Process the video end-to-end, run inference on every frame, and write
-        the recommendation JSONL. Returns the path to the written file.
+        Run inference over all frames and write the JSONL output file.
 
-        If a VideoAnalyzer output JSON already exists for this video, it is
-        loaded directly and the Roboflow analysis step is skipped.
+        Returns:
+            Path to the written JSONL file.
+
+        Raises:
+            FileNotFoundError: if the cached analysis JSON does not exist.
         """
-        video_stem = Path(self._video_path).stem
-        cached_json = Path(self._analysis_output_dir) / f"{video_stem}_analysis.json"
+        stem = Path(self._video_path).stem
+        cached = self._analysis_dir / f"{stem}_analysis.json"
 
-        if cached_json.exists():
-            print(f"Loading cached analysis: {cached_json}")
-            import json as _json
-
-            with open(cached_json) as _f:
-                result = _json.load(_f)
+        if cached.exists():
+            print(f"Loading cached analysis: {cached}")
+            with open(cached, encoding="utf-8") as analysis_file:
+                result = json.load(analysis_file)
         else:
-            print(f"Analyzing video: {self._video_path}")
-            analyzer = VideoAnalyzer(
-                output_dir=self._analysis_output_dir,
-                verbose=True,
-                frame_skip=self._frame_skip,
-            )
-            result = analyzer.analyze_video(self._video_path)
+            print(f"No cached analysis for {stem}. Run analyze_video.py first.")
+            raise FileNotFoundError(cached)
 
-        frames = result["frames"]
-        print(f"Video analysis complete: {len(frames)} frames extracted.")
+        frames: List[FrameDict] = result["frames"]
+        print(f"Loaded {len(frames)} frames. Running inference ...")
 
-        print(f"Loading DT checkpoint: {self._checkpoint_path}")
-        strategy = DTStrategy(
-            checkpoint_path=self._checkpoint_path,
-            device="cpu",
-        )
+        strategy = DTStrategy(self._checkpoint, device=self._device)
         strategy.reset_game()
 
-        if not strategy.is_ready:
-            print(
-                "Warning: DTStrategy could not load the checkpoint. "
-                "All frames will be written with has_recommendation=false."
-            )
+        self._output.parent.mkdir(parents=True, exist_ok=True)
+        n_recs: int = 0
 
-        self._output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-
-        n_recommendations = 0
-        with open(self._output_jsonl, "w") as f:
+        with open(self._output, "w", encoding="utf-8") as out_file:
             for frame in frames:
-                timestamp_ms: int = frame["timestamp_ms"]
-                player_elixir: int = frame.get("player_elixir", 0)
-
+                ts: int = frame["timestamp_ms"]
+                elx = frame.get("player_elixir", 0)
                 rec = strategy.recommend(frame)
 
-                # Carry detections through so the player can log them.
-                detections = frame.get("detections", [])
-
+                entry: RecommendationDict
                 if rec is not None:
                     card, tile_x, tile_y = rec
-                    entry = {
-                        "timestamp_ms": timestamp_ms,
-                        "player_elixir": player_elixir,
-                        "has_recommendation": True,
-                        "card": card,
-                        "tile_x": int(tile_x),
-                        "tile_y": int(tile_y),
-                        "elixir_required": int(get_elixir_cost(card)),
-                        "detections": detections,
-                    }
-                    n_recommendations += 1
+                    cost: int = elixir_cost(card) or 0
+                    entry = RecommendationDict(
+                        timestamp_ms=ts,
+                        player_elixir=elx,
+                        has_recommendation=True,
+                        card=card,
+                        tile_x=tile_x,
+                        tile_y=tile_y,
+                        elixir_required=cost,
+                        detections=frame.get("detections", []),
+                    )
+                    n_recs += 1
                 else:
-                    entry = {
-                        "timestamp_ms": timestamp_ms,
-                        "player_elixir": player_elixir,
-                        "has_recommendation": False,
-                        "detections": detections,
-                    }
+                    entry = RecommendationDict(
+                        timestamp_ms=ts,
+                        player_elixir=elx,
+                        has_recommendation=False,
+                        detections=frame.get("detections", []),
+                    )
+                out_file.write(json.dumps(dict(entry)) + "\n")
 
-                f.write(json.dumps(entry) + "\n")
-
-        print(
-            f"Wrote {len(frames)} frames ({n_recommendations} with recommendations) "
-            f"to {self._output_jsonl}"
-        )
-        return self._output_jsonl
+        print(f"Wrote {len(frames)} frames ({n_recs} recommendations) -> {self._output}")
+        return self._output

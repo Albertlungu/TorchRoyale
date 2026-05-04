@@ -17,7 +17,11 @@ mss
 
 # ML / Decision Transformer
 torch>=2.0.0
+torchvision
+ultralytics
 numpy
 scikit-learn
 joblib
 tqdm
+
+python-dotenv

@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 78
+names: ['baby-dragon', 'balloon', 'bandit', 'barbarian', 'bats', 'bomb-tower', 'bomber', 'boss-bandit', 'bowler', 'brawler', 'cannon', 'dark-prince', 'dart-goblin', 'electro-dragon', 'electro-giant', 'electro-spirit', 'evo-bomber', 'evo-brawler', 'evo-cannon', 'evo-firecracker', 'evo-goblin-cage', 'evo-ice-spirit', 'evo-musketeer', 'evo-royal-ghost', 'evo-royal-giant', 'evo-royal-recruits', 'evo-skeleton-barrel', 'fire-spirit', 'fireball', 'firecracker', 'flying-machine', 'furnace', 'giant', 'giant-sk', 'goblin', 'goblin-barrel', 'goblin-cage', 'golden-knight', 'golem', 'guardian', 'hero-giant', 'hero-knight', 'hero-mini-pekka', 'hero-musketeer', 'hero-wizard', 'hog-rider', 'ice-spirit', 'inferno-dragon', 'knight', 'little-prince', 'lumberjack', 'magic-archer', 'mega-knight', 'mighty-miner', 'miner', 'mini-pekka', 'minion', 'mortar', 'musketeer', 'princess', 'rascal-girl', 'rocket', 'royal-ghost', 'royal-giant', 'royal-recruits', 'skeleton', 'skeleton-barrel', 'skeleton-dragon', 'skeleton-giant', 'skeletons', 'snowball', 'spear-goblin', 'tesla', 'tesla-closed', 'valkyrie', 'wall-breaker', 'witch', 'zappie']
+
+roboflow:
+  workspace: fafa-zoa5z
+  project: fafa-zoa5z
+  version: dataset
+  license: Private
+  url: https://app.roboflow.com/fafa-zoa5z/fafa-zoa5z/dataset

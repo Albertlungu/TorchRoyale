@@ -1,0 +1,6 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 14
+names: ['cannon', 'evo_cannon', 'evo_ice_spirit', 'evo_musketeer', 'evo_skeletons', 'fireball', 'hero_ice_golem', 'hero_musketeer', 'hog_rider', 'ice_golem', 'ice_spirit', 'log', 'musketeer', 'skeletons']

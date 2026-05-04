@@ -1,102 +1,110 @@
 """
 Decision Transformer for Clash Royale.
 
-Treats card placement as a sequence modeling problem. The model receives
-interleaved (return-to-go, state, action) tokens and predicts the next
-action conditioned on desired future returns.
+Architecture: GPT-style causal transformer over (return, state, action)
+triples. Predicts the next card to play and its placement tile.
 
-Architecture follows the original Decision Transformer paper
-(Chen et al., 2021) with two-headed action prediction for card
-selection and tile position.
+Input sequence per timestep:
+  [RTG token, State token, Action token]  ->  predicts next action
+
+Public API:
+  DTConfig           -- hyperparameter dataclass
+  DecisionTransformer -- nn.Module implementing the full forward pass
 """
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Tuple
 
 import torch
 import torch.nn as nn
 
-from .config import DTConfig
+from src.constants.cards import VOCAB_SIZE
+from src.constants.game import GRID_COLS, GRID_ROWS
+from src.data.feature_encoder import FEATURE_DIM
+
+
+@dataclass
+class DTConfig:
+    """Hyperparameters for the Decision Transformer and training loop."""
+
+    context_len: int = 30
+    n_layer: int = 4
+    n_head: int = 4
+    d_model: int = 128
+    dropout: float = 0.1
+    card_loss_weight: float = 1.0
+    pos_loss_weight: float = 1.0
+    max_epochs: int = 400
+    batch_size: int = 64
+    lr: float = 1e-3
+    weight_decay: float = 1e-4
+
+    @property
+    def n_positions(self) -> int:
+        """Total sequence length: RTG + state + action per context step."""
+        return self.context_len * 3
+
+    @property
+    def n_cards(self) -> int:
+        """Vocabulary size — number of distinct cards."""
+        return VOCAB_SIZE
+
+    @property
+    def n_positions_tile(self) -> int:
+        """Total number of grid tiles (flat position space)."""
+        return GRID_COLS * GRID_ROWS
 
 
 class DecisionTransformer(nn.Module):
     """
-    Decision Transformer for Clash Royale card placement.
+    Causal transformer that predicts card and placement from (RTG, state, action) sequences.
 
-    Input sequence (interleaved per timestep):
-        [RTG_1, State_1, Action_1, RTG_2, State_2, Action_2, ..., RTG_K, State_K, Action_K]
-
-    Predicts actions from state token outputs using two heads:
-        - Card head: which hand card to play (0-3)
-        - Position head: where to place it (0-575, flattened 32x18 grid)
+    The transformer decoder is used in a self-attention-only mode (memory == tgt)
+    with a causal mask, following the Decision Transformer paper.
     """
 
-    def __init__(self, config: DTConfig):
+    def __init__(self, cfg: DTConfig) -> None:
+        """
+        Args:
+            cfg: DTConfig holding all architecture hyperparameters.
+        """
         super().__init__()
-        self.config = config
-        self.embed_dim = config.embed_dim
+        self.cfg = cfg
+        d_model = cfg.d_model
 
-        # --- Token embeddings ---
+        # Input projections
+        self.state_proj = nn.Linear(FEATURE_DIM, d_model)
+        self.rtg_proj   = nn.Linear(1, d_model)
+        self.card_emb   = nn.Embedding(cfg.n_cards + 1, d_model)          # +1 for padding
+        self.pos_emb    = nn.Embedding(cfg.n_positions_tile + 1, d_model)  # +1 for padding
 
-        self.state_embed = nn.Sequential(
-            nn.Linear(config.state_dim, config.embed_dim),
-            nn.Tanh(),
-        )
-
-        self.rtg_embed = nn.Sequential(
-            nn.Linear(1, config.embed_dim),
-            nn.Tanh(),
-        )
-
-        self.action_card_embed = nn.Embedding(config.card_action_dim, config.embed_dim)
-        self.action_pos_embed = nn.Embedding(config.pos_action_dim, config.embed_dim)
-        self.action_combine = nn.Linear(config.embed_dim * 2, config.embed_dim)
-
-        # Timestep embedding (position within episode)
-        self.timestep_embed = nn.Embedding(config.max_ep_len, config.embed_dim)
-
-        # Token type embedding: 0=RTG, 1=state, 2=action
-        self.token_type_embed = nn.Embedding(3, config.embed_dim)
-
-        # Pre-transformer layer norm
-        self.embed_ln = nn.LayerNorm(config.embed_dim)
-
-        # --- Transformer ---
+        # Positional embedding over the interleaved sequence
+        self.pos_enc = nn.Embedding(cfg.n_positions, d_model)
 
         decoder_layer = nn.TransformerDecoderLayer(
-            d_model=config.embed_dim,
-            nhead=config.n_heads,
-            dim_feedforward=config.embed_dim * 4,
-            dropout=config.dropout,
-            activation="gelu",
+            d_model=d_model,
+            nhead=cfg.n_head,
+            dim_feedforward=d_model * 4,
+            dropout=cfg.dropout,
             batch_first=True,
-            norm_first=True,
         )
-        self.transformer = nn.TransformerDecoder(
-            decoder_layer,
-            num_layers=config.n_layers,
-        )
+        self.transformer = nn.TransformerDecoder(decoder_layer, num_layers=cfg.n_layer)
 
-        # --- Prediction heads ---
-
-        self.card_head = nn.Sequential(
-            nn.Linear(config.embed_dim, config.embed_dim),
-            nn.GELU(),
-            nn.Linear(config.embed_dim, config.card_action_dim),
-        )
-
-        self.pos_head = nn.Sequential(
-            nn.Linear(config.embed_dim + config.card_action_dim, config.embed_dim),
-            nn.GELU(),
-            nn.Linear(config.embed_dim, config.pos_action_dim),
-        )
+        self.ln = nn.LayerNorm(d_model)
+        self.head_card = nn.Linear(d_model, cfg.n_cards)
+        self.head_pos  = nn.Linear(d_model, cfg.n_positions_tile)
+        self.drop = nn.Dropout(cfg.dropout)
 
         self.apply(self._init_weights)
 
-    def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if module.bias is not None:
+    @staticmethod
+    def _init_weights(module: nn.Module) -> None:
+        """Initialise linear and embedding weights with std=0.02."""
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            nn.init.normal_(module.weight, std=0.02)
+            if isinstance(module, nn.Linear) and module.bias is not None:
                 nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
         elif isinstance(module, nn.LayerNorm):
             nn.init.ones_(module.weight)
             nn.init.zeros_(module.bias)
@@ -106,87 +114,60 @@ class DecisionTransformer(nn.Module):
         states: torch.Tensor,
         actions_card: torch.Tensor,
         actions_pos: torch.Tensor,
-        returns_to_go: torch.Tensor,
+        rtg: torch.Tensor,
         timesteps: torch.Tensor,
         attention_mask: torch.Tensor,
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass.
+        Forward pass over a batch of context sequences.
 
         Args:
-            states:        (B, K, 97)  float32
-            actions_card:  (B, K)      long
-            actions_pos:   (B, K)      long
-            returns_to_go: (B, K, 1)   float32
-            timesteps:     (B, K)      long
-            attention_mask: (B, K)     float32 -- 1.0 real, 0.0 padding
+            states:         (B, T, FEATURE_DIM) state feature vectors.
+            actions_card:   (B, T) card vocabulary indices.
+            actions_pos:    (B, T) flat tile position indices.
+            rtg:            (B, T, 1) return-to-go values.
+            timesteps:      (B, T) absolute timestep indices.
+            attention_mask: (B, T) binary mask; 1 = valid token, 0 = padding.
 
         Returns:
-            card_logits: (B, K, 4)
-            pos_logits:  (B, K, 576)
+            (card_logits, pos_logits) each of shape (B, T, n_cards/n_positions_tile).
         """
-        B, K = states.shape[0], states.shape[1]
-        device = states.device
+        batch_size, seq_len, _ = states.shape
+        d_model = self.cfg.d_model
 
-        # Embed each token type -> (B, K, embed_dim)
-        rtg_tokens = self.rtg_embed(returns_to_go)
-        state_tokens = self.state_embed(states)
+        state_tok = self.drop(self.state_proj(states))     # (B, T, d)
+        rtg_tok   = self.drop(self.rtg_proj(rtg))          # (B, T, d)
+        card_tok  = self.drop(self.card_emb(actions_card)) # (B, T, d)
+        pos_tok   = self.drop(self.pos_emb(actions_pos))   # (B, T, d)
+        act_tok   = card_tok + pos_tok
 
-        card_emb = self.action_card_embed(actions_card)
-        pos_emb = self.action_pos_embed(actions_pos)
-        action_tokens = self.action_combine(
-            torch.cat([card_emb, pos_emb], dim=-1)
+        # Interleave: RTG, State, Action -> shape (B, 3T, d)
+        seq = torch.stack([rtg_tok, state_tok, act_tok], dim=2).view(
+            batch_size, 3 * seq_len, d_model
         )
+        pos_ids = torch.arange(3 * seq_len, device=states.device).unsqueeze(0)
+        seq = seq + self.pos_enc(pos_ids)
 
-        # Add timestep embeddings
-        timesteps_clamped = timesteps.clamp(0, self.config.max_ep_len - 1)
-        time_emb = self.timestep_embed(timesteps_clamped)
-        rtg_tokens = rtg_tokens + time_emb
-        state_tokens = state_tokens + time_emb
-        action_tokens = action_tokens + time_emb
-
-        # Add token type embeddings
-        type_ids = torch.arange(3, device=device)
-        rtg_tokens = rtg_tokens + self.token_type_embed(type_ids[0])
-        state_tokens = state_tokens + self.token_type_embed(type_ids[1])
-        action_tokens = action_tokens + self.token_type_embed(type_ids[2])
-
-        # Interleave: [RTG_1, S_1, A_1, RTG_2, S_2, A_2, ...] -> (B, 3K, embed_dim)
-        seq = torch.stack([rtg_tokens, state_tokens, action_tokens], dim=2)
-        seq = seq.reshape(B, 3 * K, self.embed_dim)
-
-        # Expand attention mask: (B, K) -> (B, 3K)
-        seq_mask = attention_mask.unsqueeze(-1).repeat(1, 1, 3).reshape(B, 3 * K)
-
-        # Causal mask (upper triangular = -inf)
+        # Causal mask prevents attending to future positions
         causal_mask = torch.triu(
-            torch.ones(3 * K, 3 * K, device=device) * float("-inf"),
-            diagonal=1,
-        )
+            torch.ones(3 * seq_len, 3 * seq_len, device=states.device), diagonal=1
+        ).bool()
 
-        # Padding mask (True = ignore position)
-        padding_mask = seq_mask == 0
+        # Expand (B, T) padding mask to (B, 3T)
+        key_mask = attention_mask.repeat_interleave(3, dim=1).bool()
 
-        # Layer norm + transformer
-        seq = self.embed_ln(seq)
-        output = self.transformer(
+        out = self.transformer(
             tgt=seq,
             memory=seq,
             tgt_mask=causal_mask,
-            tgt_key_padding_mask=padding_mask,
-            memory_key_padding_mask=padding_mask,
+            memory_mask=causal_mask,
+            tgt_key_padding_mask=~key_mask,
+            memory_key_padding_mask=~key_mask,
         )
+        out = self.ln(out)
 
-        # Extract state token outputs at positions [1, 4, 7, ..., 3K-2]
-        state_indices = torch.arange(K, device=device) * 3 + 1
-        state_outputs = output[:, state_indices, :]
-
-        # Card prediction
-        card_logits = self.card_head(state_outputs)
-
-        # Position prediction (conditioned on card)
-        card_probs = torch.softmax(card_logits.detach(), dim=-1)
-        pos_input = torch.cat([state_outputs, card_probs], dim=-1)
-        pos_logits = self.pos_head(pos_input)
-
+        # Predict from state tokens (every 3rd token starting at index 1)
+        state_out = out[:, 1::3]               # (B, T, d)
+        card_logits = self.head_card(state_out) # (B, T, n_cards)
+        pos_logits  = self.head_pos(state_out)  # (B, T, n_positions_tile)
         return card_logits, pos_logits
