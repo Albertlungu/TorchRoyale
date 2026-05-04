@@ -3,6 +3,7 @@
 import time
 from typing import Dict, List, Optional
 
+import numpy as np
 from PIL import Image
 
 from src.detection.hand_classifier import HandClassifier
@@ -10,6 +11,8 @@ from src.detection.number_detector import NumberDetector
 from src.detection.screen_detector import ScreenDetector
 from src.detection.unit_detector import UnitDetector
 from src.namespaces.cards import Card
+from src.namespaces.cards import CARD_OBJECTS
+from src.namespaces.cards import Cards
 from src.namespaces.screens import Screens
 from src.namespaces.state import State
 
@@ -29,13 +32,28 @@ class LiveDetector:
         self.unit_detector = UnitDetector(self.cards)
         self.screen_detector = ScreenDetector()
 
+    @staticmethod
+    def _card_from_label(label: Optional[str]) -> Card:
+        if not label:
+            return Cards.BLANK
+        normalized = label.lower().replace("-", "_")
+        return CARD_OBJECTS.get(normalized, Cards.BLANK)
+
     def run(self, image: Image.Image) -> State:
-        cards = self.card_detector.classify(image)
-        ready = list(range(len(cards)))  # Assume all detected cards are ready
+        # HandClassifier expects an OpenCV-style ndarray rather than a PIL image.
+        bgr_frame = np.asarray(image.convert("RGB"))[:, :, ::-1]
+        hand_labels = self.card_detector.classify(bgr_frame)
+        cards = tuple(
+            [Cards.BLANK]
+            + [self._card_from_label(label) for label in hand_labels]
+        )
+        ready = [
+            index for index, card in enumerate(cards[1:5]) if card != Cards.BLANK
+        ]
         allies, enemies = self.unit_detector.run(image)
         numbers = self.number_detector.run(image)
         screen = self.screen_detector.run(image)
-        return State(allies, enemies, numbers, tuple(cards), ready, screen)
+        return State(allies, enemies, numbers, cards, ready, screen)
 
 
 class StateAdapter:
