@@ -9,6 +9,8 @@ from src.detection.hand_classifier import HandClassifier
 from src.detection.number_detector import NumberDetector
 from src.detection.screen_detector import ScreenDetector
 from src.detection.unit_detector import UnitDetector
+from src.game_state.building_tracker import BuildingPlacementTracker
+from src.game_state.opponent_tracker import OpponentTracker
 from src.namespaces.cards import Card
 from src.namespaces.screens import Screens
 from src.namespaces.state import State
@@ -28,6 +30,8 @@ class LiveDetector:
         self.number_detector = NumberDetector()
         self.unit_detector = UnitDetector(self.cards)
         self.screen_detector = ScreenDetector()
+        self.opponent_tracker = OpponentTracker(initial_elixir=5)
+        self.building_tracker = BuildingPlacementTracker()
 
     def run(self, image: Image.Image) -> State:
         cards = self.card_detector.classify(image)
@@ -35,7 +39,41 @@ class LiveDetector:
         allies, enemies = self.unit_detector.run(image)
         numbers = self.number_detector.run(image)
         screen = self.screen_detector.run(image)
+
+        # Track opponent cards and buildings
+        self._track_opponent_state(allies, enemies, numbers)
+
         return State(allies, enemies, numbers, tuple(cards), ready, screen)
+
+    def _track_opponent_state(self, allies: list, enemies: list, numbers) -> None:
+        """Track opponent cards, buildings, and update trackers."""
+        current_time = time.time()
+
+        # Track opponent unit plays (cards that just appeared)
+        for enemy in enemies:
+            # Check if this is a new unit (not seen in previous frame)
+            # In a real implementation, you'd need to track previous frame state
+            # For now, we'll just record all enemy units as potential card plays
+            self.opponent_tracker.record_card_play(
+                enemy.unit.name.lower(), current_time
+            )
+
+            # Track buildings for prediction fireballing
+            if hasattr(enemy.unit, "building") or enemy.unit.name.lower() in [
+                "cannon",
+                "tesla",
+                "inferno-tower",
+                "bomb-tower",
+                "goblin-cage",
+                "tombstone",
+                "furnace",
+            ]:
+                self.building_tracker.record_building_placement(
+                    enemy.unit.name.lower(),
+                    enemy.position.tile_x,
+                    enemy.position.tile_y,
+                    current_time,
+                )
 
 
 class StateAdapter:
