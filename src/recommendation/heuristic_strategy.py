@@ -35,6 +35,7 @@ from src.actions import (
 )
 from src.constants.cards import elixir_cost
 from src.constants.game import GRID_COLS, GRID_ROWS, PLAYER_SIDE_MIN_ROW
+from src.game_state.deck_classifier import DeckArchetype, DeckClassifier
 from src.game_state.opponent_tracker import OpponentTracker
 
 if TYPE_CHECKING:
@@ -43,6 +44,8 @@ if TYPE_CHECKING:
 
 _VALID_PLAYER_ROWS = set(range(PLAYER_SIDE_MIN_ROW, GRID_ROWS))
 _VALID_COLS = set(range(GRID_COLS))
+_PROFILE_MIN_ROW = 9
+_PROFILE_MAX_ROW = 18
 
 # Mapping of card names to their heuristic action classes
 _CARD_TO_ACTION = {
@@ -64,6 +67,36 @@ _STRATEGIC_CONTEXT_CACHE: Dict[str, Dict[str, float]] = {}
 def _is_valid_tile(col: int, row: int) -> bool:
     """Return True if (col, row) is on the player's side and within grid bounds."""
     return col in _VALID_COLS and row in _VALID_PLAYER_ROWS
+
+
+def _profile_row_to_board_row(profile_row: int) -> int:
+    """Map profile row scale (9-18) to board rows, where 18 is near bridge."""
+    ratio = (profile_row - _PROFILE_MIN_ROW) / (_PROFILE_MAX_ROW - _PROFILE_MIN_ROW)
+    mapped = (GRID_ROWS - 1) - ratio * ((GRID_ROWS - 1) - PLAYER_SIDE_MIN_ROW)
+    return int(round(mapped))
+
+
+def _aggression_row_window(aggression_factor: float) -> Tuple[int, int]:
+    """
+    Convert aggression factor into a bounded board row window.
+
+    Aggressive profile rows: 15-18
+    Balanced profile rows:   12-15
+    Defensive profile rows:   9-12
+    """
+    if aggression_factor >= 0.5:
+        profile_start, profile_end = 15, 18
+    elif aggression_factor <= -0.15:
+        profile_start, profile_end = 9, 12
+    else:
+        profile_start, profile_end = 12, 15
+
+    row_a = _profile_row_to_board_row(profile_start)
+    row_b = _profile_row_to_board_row(profile_end)
+
+    row_min = max(PLAYER_SIDE_MIN_ROW, min(row_a, row_b))
+    row_max = min(GRID_ROWS - 1, max(row_a, row_b))
+    return row_min, row_max
 
 
 def _generate_state_signature(state: FrameDict) -> str:
@@ -173,9 +206,11 @@ def _extract_strategic_context(
     context["tank_support_ratio"] = float(np.tanh(embedding[5]))
 
     # Check if opponent lacks counters to our win condition (hog rider)
-    context["opponent_lacks_hog_counter"] = float(
-        not opponent_tracker.has_counter("hog-rider")
-    )
+    opponent_lacks_hog_counter = not opponent_tracker.has_counter("hog-rider")
+    context["opponent_lacks_hog_counter"] = float(opponent_lacks_hog_counter)
+
+    if opponent_lacks_hog_counter and elixir_advantage > 3:
+        context["aggression_factor"] = float(context["aggression_factor"] * 1.5)
 
     # Temporal stability factor
     context["stability"] = float(np.exp(-abs(embedding[6])))
@@ -263,6 +298,13 @@ class HybridStrategy:
         self._opponent_tracker = OpponentTracker(initial_elixir=5)
         self._game_start_time: Optional[float] = None
 
+        # Deck classification
+        self._deck_classifier = DeckClassifier()
+        self._our_archetype: Optional[DeckArchetype] = None
+        self._opponent_archetype: Optional[DeckArchetype] = None
+        self._our_deck: List[str] = []
+        self._opponent_deck: List[str] = []
+
         self._ready = True
 
     def _load_dt_config(self) -> Dict[str, Any]:
@@ -323,6 +365,12 @@ class HybridStrategy:
         self._opponent_tracker.reset()
         self._game_start_time = None
 
+        # Reset deck classification
+        self._our_archetype = None
+        self._opponent_archetype = None
+        self._our_deck = []
+        self._opponent_deck = []
+
         # Clear caches
         _EMBEDDING_CACHE.clear()
         _STRATEGIC_CONTEXT_CACHE.clear()
@@ -342,6 +390,15 @@ class HybridStrategy:
         elixir_multiplier = int(state.get("elixir_multiplier", 1))
 
         self._opponent_tracker.update_elixir(game_time_elapsed, elixir_multiplier)
+
+        # Classify decks if not already done
+        if self._our_archetype is None:
+            self._our_deck = [
+                c.lower().replace("-in-hand", "")
+                for c in state.get("hand_cards", [])[:4]
+            ]
+            self._our_archetype = self._deck_classifier.classify_deck(self._our_deck)
+            print(f"[HybridStrategy] Our deck archetype: {self._our_archetype.value}")
 
         # Compute embedding from state
         embedding = _compute_dt_embedding(state, str(self._checkpoint_path))
@@ -413,6 +470,31 @@ class HybridStrategy:
 
         return dt_card, dt_tile_x, dt_tile_y, confidence
 
+    def _update_opponent_card_tracking(
+        self, state: FrameDict, timestamp: float
+    ) -> None:
+        """Record newly observed opponent on-field cards into OpponentTracker."""
+        detections = state.get("detections", [])
+        enemy_counts: Dict[str, int] = {}
+
+        for det in detections:
+            if not det.get("is_opponent") or not det.get("is_on_field"):
+                continue
+
+            name = str(det.get("class_name") or "").strip().lower().replace("_", "-")
+            if not name:
+                continue
+
+            enemy_counts[name] = enemy_counts.get(name, 0) + 1
+
+        for card_name, count in enemy_counts.items():
+            previous_count = self._previous_enemy_counts.get(card_name, 0)
+            new_instances = max(0, count - previous_count)
+            for _ in range(new_instances):
+                self._opponent_tracker.record_card_play(card_name, timestamp)
+
+        self._previous_enemy_counts = enemy_counts
+
     def _evaluate_heuristic_actions(
         self, state: FrameDict, context: Dict[str, float]
     ) -> List[Tuple[str, int, int, List[float]]]:
@@ -421,6 +503,7 @@ class HybridStrategy:
 
         hand: List[str] = state.get("hand_cards", [])
         detections = state.get("detections", [])
+        row_min, row_max = _aggression_row_window(context["aggression_factor"])
 
         evaluated_actions = []
 
@@ -436,7 +519,7 @@ class HybridStrategy:
 
             # Try all valid tile positions
             for tile_x in range(GRID_COLS):
-                for tile_y in range(PLAYER_SIDE_MIN_ROW, GRID_ROWS):
+                for tile_y in range(row_min, row_max + 1):
                     if not _is_valid_tile(tile_x, tile_y):
                         continue
 
@@ -475,6 +558,7 @@ class HybridStrategy:
         # Extract strategic context from DT embedding
         embedding = _compute_dt_embedding(state, str(self._checkpoint_path))
         context = _extract_strategic_context(embedding, state, self._opponent_tracker)
+        self._log_opponent_state(state, context)
 
         # Phase 2: Heuristic evaluation with DT context
         heuristic_actions = self._evaluate_heuristic_actions(state, context)
@@ -562,15 +646,6 @@ class HybridStrategy:
 
             return None
 
-        # Log opponent state for debugging
-        player_elixir = float(state.get("player_elixir", 0) or 0)
-        print(f"[HybridStrategy] {self._opponent_tracker.get_state_string()}")
-        print(
-            f"[HybridStrategy] Elixir Advantage: {self._opponent_tracker.get_elixir_advantage(player_elixir):.1f} | "
-            f"Aggression: {context['aggression_factor']:.2f} | "
-            f"Lacks Hog Counter: {bool(context['opponent_lacks_hog_counter'])}"
-        )
-
         # Record decision in model state for potential online learning
         if self._model_state.get("last_embedding") is not None:
             final_card, final_tile_x, final_tile_y = best_action
@@ -584,6 +659,16 @@ class HybridStrategy:
             )
 
         return best_action
+
+    def _log_opponent_state(self, state: FrameDict, context: Dict[str, float]) -> None:
+        """Print opponent macro state for runtime debugging."""
+        player_elixir = float(state.get("player_elixir", 0) or 0)
+        print(f"[HybridStrategy] {self._opponent_tracker.get_state_string()}")
+        print(
+            f"[HybridStrategy] Elixir Advantage: {self._opponent_tracker.get_elixir_advantage(player_elixir):.1f} | "
+            f"Aggression: {context['aggression_factor']:.2f} | "
+            f"Lacks Hog Counter: {bool(context['opponent_lacks_hog_counter'])}"
+        )
 
     def _score_action(
         self, action, state: FrameDict, detections: List[dict]
