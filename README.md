@@ -249,6 +249,44 @@ The `last_played_evo` field exposes which cards were just played as evo, used by
 
 ---
 
+### Strategy Layer
+
+#### HybridStrategy (`src/recommendation/heuristic_strategy.py`)
+
+Production-grade ensemble combining Decision Transformer with heuristic refinement. The DT serves as the primary decision-maker with heuristics providing tactical validation.
+
+**Architecture:**
+- **DT Inference**: Loads model from checkpoint, generates 128-dim strategic embeddings from game state
+- **Strategic Context Generator**: Converts embeddings to 6 tactical parameters:
+  - `aggression_factor`: Macro-level push tendency (0-1)
+  - `defensive_weight`: Conservative placement bias (0-1)  
+  - `elixir_conservatism`: Resource management style (0-1)
+  - `bridge_pressure`: Bridge control priority (0-1)
+  - `spell_readiness`: Spell casting opportunity (0-1)
+  - `tank_support_ratio`: Tank-to-support unit balance (-1 to 1)
+- **Heuristic Ensemble**: 8 specialized action classes score placements using DT context
+- **Decision Fusion**: Dynamically weights DT predictions (70% base) vs heuristics (30% base) based on confidence and context
+- **Safety Validator**: Ensures recommendations meet game constraints (elixir, hand, tile validity)
+
+**DT-First Design:**
+- Model runs inference every frame to generate strategic embeddings
+- Embeddings inform heuristic parameters through learned transformations
+- Final decision weights DT prediction at 70-80% with heuristic refinement at 20-30%
+- Heuristics act as "reality check" rather than primary decision-maker
+
+**Production Robustness:**
+- On-field detection quality variations make pure DT unreliable
+- Heuristic layer ensures valid, optimal placements despite detection noise
+- Context buffer maintains last 10 game states for temporal consistency
+- Caching system reduces redundant computations
+
+**Fallback Hierarchy:**
+1. DT + Heuristic ensemble (primary)
+2. DT prediction alone (if heuristics fail)
+3. Most expensive affordable card (ultimate fallback)
+
+---
+
 ### Analysis Pipeline
 
 #### VideoAnalyzer (`src/overlay/analyzer.py`)
@@ -671,6 +709,14 @@ Player and opponent tower HP is not tracked. `player_towers` and `opponent_tower
 RTG is always 0.0. Real implementation would use game outcome (win/loss) or elixir advantage metrics.
 
 **Impact:** Model has no reward signal to distinguish winning vs losing plays.
+
+### Hybrid Strategy DT Dependency
+
+The HybridStrategy requires a trained DT checkpoint at `data/models/dt/best.pt`. Without this, the system falls back to pure heuristic mode which lacks strategic depth.
+
+**Impact:** Heuristic-only mode makes locally optimal but not strategically sound decisions.
+
+**Workaround:** Train the DT model on 100+ replays before deployment. The checkpoint must contain both model weights and config metadata.
 
 ---
 
