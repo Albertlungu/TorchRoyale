@@ -1,4 +1,4 @@
-"""ONNX side classifier for ally vs enemy units."""
+"""Side classifier for distinguishing ally and enemy units."""
 
 from __future__ import annotations
 

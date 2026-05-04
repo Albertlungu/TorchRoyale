@@ -1,0 +1,22 @@
+adb:
+  device_serial: ''
+  ip: 127.0.0.1
+bot:
+  auto_start_game: false
+  deck:
+  - minions
+  - giant
+  - knight
+  - arrows
+  - archers
+  - musketeer
+  - fireball
+  - minipekka
+  load_deck: false
+  log_level: INFO
+ingame:
+  play_action: 1.0
+visuals:
+  save_images: false
+  save_labels: false
+  show_images: true
