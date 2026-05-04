@@ -482,11 +482,22 @@ class HybridStrategy:
         if not heuristic_actions:
             return None
 
-        # Phase 3: Ensemble decision fusion
+        # Phase 3: Ensemble decision fusion with counter-to-counter logic
         best_fusion_score = -1.0
         best_action = None
 
+        # Get our hand for counter-to-counter checking
+        our_hand = state.get("hand_cards", [])
+
         for card_name, tile_x, tile_y, heuristic_score in heuristic_actions:
+            # Check if we can counter their counter (professional-level play)
+            can_counter_their_counter = (
+                self._opponent_tracker.can_we_counter_their_counter(our_hand, card_name)
+            )
+
+            # Boost score significantly if we can counter their counter
+            counter_bonus = 1.5 if can_counter_their_counter else 1.0
+
             # Compute ensemble weight based on DT confidence and context
             ensemble_weight = _compute_ensemble_weight(
                 dt_confidence, heuristic_score[0], context
@@ -503,7 +514,7 @@ class HybridStrategy:
                 else 0.0
             )
 
-            # Score based on alignment and heuristic quality
+            # Score based on alignment, heuristic quality, and counter-to-counter
             if dt_alignment > 0.5:
                 # DT and heuristic agree - strong signal
                 fusion_score = (heuristic_score[0] * 0.4) + (dt_confidence * 0.6)
@@ -512,6 +523,9 @@ class HybridStrategy:
                 heuristic_contribution = heuristic_score[0] * ensemble_weight
                 dt_contribution = dt_confidence * (1.0 - ensemble_weight) * 0.5
                 fusion_score = heuristic_contribution + dt_contribution
+
+            # Apply counter-to-counter bonus
+            fusion_score *= counter_bonus
 
             # Add small noise for tie-breaking (not for obfuscation, but realistic)
             tie_breaker = (hash(f"{card_name}_{tile_x}_{tile_y}") % 100) / 1000.0
