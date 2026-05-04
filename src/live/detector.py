@@ -1,6 +1,7 @@
 """Detector orchestrator for live TorchRoyale gameplay."""
 
 import time
+from collections import Counter
 from typing import Dict, List, Optional
 
 from PIL import Image
@@ -32,6 +33,8 @@ class LiveDetector:
         self.screen_detector = ScreenDetector()
         self.opponent_tracker = OpponentTracker(initial_elixir=5)
         self.building_tracker = BuildingPlacementTracker()
+        self._game_started_at: Optional[float] = None
+        self._previous_enemy_counts: Dict[str, int] = {}
 
     def run(self, image: Image.Image) -> State:
         cards = self.card_detector.classify(image)
@@ -41,25 +44,75 @@ class LiveDetector:
         screen = self.screen_detector.run(image)
 
         # Track opponent cards and buildings
-        self._track_opponent_state(allies, enemies, numbers)
+        self._track_opponent_state(enemies, screen)
 
         return State(allies, enemies, numbers, tuple(cards), ready, screen)
 
-    def _track_opponent_state(self, allies: list, enemies: list, numbers) -> None:
+    def _game_time_elapsed(self, screen: Screens) -> Optional[float]:
+        """Return elapsed game time in seconds for the current match."""
+        if screen != Screens.IN_GAME:
+            self._game_started_at = None
+            self._previous_enemy_counts.clear()
+            self.opponent_tracker.reset()
+            self.building_tracker.reset()
+            return None
+
+        now = time.time()
+        if self._game_started_at is None:
+            self._game_started_at = now
+            return 0.0
+
+        return max(0.0, now - self._game_started_at)
+
+    @staticmethod
+    def _elixir_multiplier_for_elapsed(game_time_elapsed: float) -> int:
+        """
+        Return elixir multiplier from elapsed match time.
+
+        0:00-2:00  -> 1x
+        2:00-4:00  -> 2x (double + early overtime)
+        4:00-5:00  -> 3x (late overtime)
+        """
+        if game_time_elapsed < 120:
+            return 1
+        if game_time_elapsed < 240:
+            return 2
+        return 3
+
+    @staticmethod
+    def _normalize_enemy_name(name: str) -> str:
+        return name.lower().replace("_", "-")
+
+    def _track_opponent_state(self, enemies: list, screen: Screens) -> None:
         """Track opponent cards, buildings, and update trackers."""
-        current_time = time.time()
+        game_time_elapsed = self._game_time_elapsed(screen)
+        if game_time_elapsed is None:
+            return
 
-        # Track opponent unit plays (cards that just appeared)
+        # Update elixir with phase-aware multiplier.
+        elixir_multiplier = self._elixir_multiplier_for_elapsed(game_time_elapsed)
+        self.opponent_tracker.update_elixir(game_time_elapsed, elixir_multiplier)
+
+        # Track newly appeared opponent cards using count delta per card name.
+        enemy_counts = Counter(
+            self._normalize_enemy_name(enemy.unit.name)
+            for enemy in enemies
+            if getattr(enemy, "unit", None) is not None
+        )
+
+        for card_name, count in enemy_counts.items():
+            previous_count = self._previous_enemy_counts.get(card_name, 0)
+            new_instances = max(0, count - previous_count)
+            for _ in range(new_instances):
+                self.opponent_tracker.record_card_play(card_name, game_time_elapsed)
+
+        self._previous_enemy_counts = dict(enemy_counts)
+
+        # Track buildings for prediction fireballing.
         for enemy in enemies:
-            # Check if this is a new unit (not seen in previous frame)
-            # In a real implementation, you'd need to track previous frame state
-            # For now, we'll just record all enemy units as potential card plays
-            self.opponent_tracker.record_card_play(
-                enemy.unit.name.lower(), current_time
-            )
+            enemy_name = self._normalize_enemy_name(enemy.unit.name)
 
-            # Track buildings for prediction fireballing
-            if hasattr(enemy.unit, "building") or enemy.unit.name.lower() in [
+            if hasattr(enemy.unit, "building") or enemy_name in [
                 "cannon",
                 "tesla",
                 "inferno-tower",
@@ -69,10 +122,10 @@ class LiveDetector:
                 "furnace",
             ]:
                 self.building_tracker.record_building_placement(
-                    enemy.unit.name.lower(),
+                    enemy_name,
                     enemy.position.tile_x,
                     enemy.position.tile_y,
-                    current_time,
+                    game_time_elapsed,
                 )
 
 
@@ -81,6 +134,7 @@ class StateAdapter:
 
     def __init__(self) -> None:
         self._game_started_at: Optional[float] = None
+        self._overtime_started_at: Optional[float] = None
 
     @staticmethod
     def _normalize_name(name: str) -> str:
@@ -89,22 +143,40 @@ class StateAdapter:
     def _time_remaining(self, state: State) -> Optional[int]:
         if state.screen == Screens.IN_GAME and self._game_started_at is None:
             self._game_started_at = time.time()
+            self._overtime_started_at = None
         elif state.screen != Screens.IN_GAME:
             self._game_started_at = None
+            self._overtime_started_at = None
 
         if self._game_started_at is None:
             return None
 
         elapsed = int(time.time() - self._game_started_at)
-        return max(0, 180 - elapsed)
+        if elapsed <= 180:
+            return max(0, 180 - elapsed)
 
-    @staticmethod
-    def _phase_from_time_remaining(time_remaining: Optional[int]) -> str:
+        overtime_elapsed = elapsed - 180
+        if self._overtime_started_at is None:
+            self._overtime_started_at = time.time() - overtime_elapsed
+        return max(0, 120 - overtime_elapsed)
+
+    def _phase_from_time_remaining(self, time_remaining: Optional[int]) -> str:
         if time_remaining is None:
             return "single"
-        if time_remaining <= 60:
-            return "double"
-        return "single"
+        if self._overtime_started_at is None:
+            return "double" if time_remaining <= 60 else "single"
+        if time_remaining <= 0:
+            return "game_over"
+        return "triple" if time_remaining <= 60 else "double"
+
+    def _elixir_multiplier_from_time_remaining(self, time_remaining: Optional[int]) -> int:
+        if time_remaining is None:
+            return 1
+        if self._overtime_started_at is None:
+            return 2 if time_remaining <= 60 else 1
+        if time_remaining <= 0:
+            return 1
+        return 3 if time_remaining <= 60 else 2
 
     def _detections(self, state: State) -> List[Dict[str, object]]:
         payload = []
@@ -136,9 +208,9 @@ class StateAdapter:
             "timestamp_ms": int(time.time() * 1000),
             "game_time_remaining": time_remaining,
             "game_phase": self._phase_from_time_remaining(time_remaining),
-            "elixir_multiplier": 2
-            if time_remaining is not None and time_remaining <= 60
-            else 1,
+            "elixir_multiplier": self._elixir_multiplier_from_time_remaining(
+                time_remaining
+            ),
             "player_elixir": int(round(state.numbers.elixir.number)),
             "opponent_elixir_estimated": 5.0,
             "detections": self._detections(state),

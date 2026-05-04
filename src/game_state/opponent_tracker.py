@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from src.constants.cards import elixir_cost
 
 # Load card costs from data file
-_CARD_COSTS_PATH = Path(__file__).parents[2] / "card_costs.json"
+_CARD_COSTS_PATH = Path(__file__).parents[2] / "data" / "card_costs.json"
 _CARD_COSTS: Dict[str, int] = {}
 
 if _CARD_COSTS_PATH.exists():
