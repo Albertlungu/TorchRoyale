@@ -1,4 +1,4 @@
-"""TorchRoyale action exports."""
+"""TorchRoyale strategic coordination modules."""
 
 from src.actions.archers_action import ArchersAction
 from src.actions.arrows_action import ArrowsAction

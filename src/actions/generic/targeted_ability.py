@@ -1,4 +1,4 @@
-"""Spell scoring heuristics."""
+"""Targeted ability module for spell coordination."""
 
 import math
 
@@ -6,8 +6,8 @@ from src.actions.generic.action import Action
 from src.namespaces.units import Units
 
 
-class SpellAction(Action):
-    """Cast spells to maximize enemy unit hit value."""
+class TargetedAbility(Action):
+    """Strategic spell deployment based on target value analysis."""
 
     RADIUS = None
     MIN_SCORE = 5

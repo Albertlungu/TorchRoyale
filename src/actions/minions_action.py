@@ -1,8 +1,8 @@
-"""Minions play heuristics."""
+"""Minions strategic coordination module."""
 
-from src.actions.generic.overhead_action import OverheadAction
+from src.actions.generic.aerial_coordination import AerialCoordination
 from src.namespaces.cards import Cards
 
 
-class MinionsAction(OverheadAction):
+class MinionsAction(AerialCoordination):
     CARD = Cards.MINIONS

@@ -1,10 +1,10 @@
-"""Giant play heuristics."""
+"""Giant strategic coordination module."""
 
-from src.actions.generic.action import Action
+from src.actions.generic.offensive_tactics import OffensiveTactics
 from src.namespaces.cards import Cards
 
 
-class GiantAction(Action):
+class GiantAction(OffensiveTactics):
     CARD = Cards.GIANT
 
     def calculate_score(self, state):

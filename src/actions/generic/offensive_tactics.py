@@ -1,10 +1,10 @@
-"""Bridge play heuristics."""
+"""Offensive tactics module for strategic unit placement."""
 
 from src.actions.generic.action import Action
 
 
-class BridgeAction(Action):
-    """Play at bridge only when capped elixir favors pressure."""
+class OffensiveTactics(Action):
+    """Strategic offensive positioning based on game state analysis."""
 
     def calculate_score(self, state):
         if (self.tile_x, self.tile_y) not in {(3, 15), (14, 15)}:

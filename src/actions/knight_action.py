@@ -1,8 +1,8 @@
-"""Knight play heuristics."""
+"""Knight strategic coordination module."""
 
-from src.actions.generic.defense_action import DefenseAction
+from src.actions.generic.defensive_positioning import DefensivePositioning
 from src.namespaces.cards import Cards
 
 
-class KnightAction(DefenseAction):
+class KnightAction(DefensivePositioning):
     CARD = Cards.KNIGHT

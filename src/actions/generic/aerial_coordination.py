@@ -1,12 +1,12 @@
-"""Air troop drop heuristics."""
+"""Aerial coordination module for air unit deployment."""
 
 import math
 
 from src.actions.generic.action import Action
 
 
-class OverheadAction(Action):
-    """Drop directly over enemy troops, or cycle at 10 elixir."""
+class AerialCoordination(Action):
+    """Strategic air unit deployment based on battlefield analysis."""
 
     def calculate_score(self, state):
         score = [0.5] if state.numbers.elixir.number == 10 else [0]

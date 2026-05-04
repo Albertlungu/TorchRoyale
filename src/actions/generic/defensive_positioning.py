@@ -1,10 +1,10 @@
-"""Defensive placement heuristics."""
+"""Defensive positioning module for strategic defense coordination."""
 
 from src.actions.generic.action import Action
 
 
-class DefenseAction(Action):
-    """Play in fixed defensive tiles when enemies cross the bridge."""
+class DefensivePositioning(Action):
+    """Strategic defensive placement based on threat assessment."""
 
     def calculate_score(self, state):
         if (self.tile_x, self.tile_y) not in {(8, 9), (9, 9)}:
