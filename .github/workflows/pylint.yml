@@ -1,0 +1,73 @@
+name: Pylint Check
+
+on:
+  # Manual trigger via the Actions tab "Run workflow" button
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: 'Python version to use'
+        required: true
+        default: '3.11'
+        type: choice
+        options:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+      fail-under:
+        description: 'Minimum pylint score (0-10) to pass'
+        required: true
+        default: '8.0'
+        type: string
+      paths:
+        description: 'Paths to lint (space-separated, default: all Python files)'
+        required: false
+        default: '.'
+        type: string
+
+jobs:
+  pylint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint
+          # Install your project dependencies if you have a requirements file
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          # Install the package itself if it's installable
+          if [ -f setup.py ] || [ -f pyproject.toml ]; then pip install -e .; fi
+
+      - name: Run Pylint
+        run: |
+          echo "Running pylint on: ${{ github.event.inputs.paths }}"
+          pylint \
+            --fail-under=${{ github.event.inputs.fail-under }} \
+            --output-format=text \
+            --reports=y \
+            ${{ github.event.inputs.paths }}
+
+      - name: Generate Pylint Report (JSON)
+        if: always()
+        run: |
+          pylint \
+            --output-format=json \
+            ${{ github.event.inputs.paths }} > pylint-report.json || true
+
+      - name: Upload Pylint Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pylint-report
+          path: pylint-report.json
