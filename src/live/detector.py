@@ -1,13 +1,11 @@
 """Detector orchestrator for live TorchRoyale gameplay."""
 
 import time
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List, Optional
 
 from PIL import Image
 
-from src.detection.card_detector import CardDetector
+from src.detection.hand_classifier import HandClassifier
 from src.detection.number_detector import NumberDetector
 from src.detection.screen_detector import ScreenDetector
 from src.detection.unit_detector import UnitDetector
@@ -26,13 +24,14 @@ class LiveDetector:
             raise ValueError(f"You must specify all {self.DECK_SIZE} deck cards.")
 
         self.cards = list(cards)
-        self.card_detector = CardDetector(self.cards)
+        self.card_detector = HandClassifier()
         self.number_detector = NumberDetector()
         self.unit_detector = UnitDetector(self.cards)
         self.screen_detector = ScreenDetector()
 
     def run(self, image: Image.Image) -> State:
-        cards, ready = self.card_detector.run(image)
+        cards = self.card_detector.classify(image)
+        ready = list(range(len(cards)))  # Assume all detected cards are ready
         allies, enemies = self.unit_detector.run(image)
         numbers = self.number_detector.run(image)
         screen = self.screen_detector.run(image)
@@ -99,21 +98,40 @@ class StateAdapter:
             "timestamp_ms": int(time.time() * 1000),
             "game_time_remaining": time_remaining,
             "game_phase": self._phase_from_time_remaining(time_remaining),
-            "elixir_multiplier": 2 if time_remaining is not None and time_remaining <= 60 else 1,
+            "elixir_multiplier": 2
+            if time_remaining is not None and time_remaining <= 60
+            else 1,
             "player_elixir": int(round(state.numbers.elixir.number)),
             "opponent_elixir_estimated": 5.0,
             "detections": self._detections(state),
             "player_towers": {
-                "player_left": {"health_percent": round(state.numbers.left_ally_princess_hp.number * 100, 2)},
+                "player_left": {
+                    "health_percent": round(
+                        state.numbers.left_ally_princess_hp.number * 100, 2
+                    )
+                },
                 "player_king": {"health_percent": 100.0},
-                "player_right": {"health_percent": round(state.numbers.right_ally_princess_hp.number * 100, 2)},
+                "player_right": {
+                    "health_percent": round(
+                        state.numbers.right_ally_princess_hp.number * 100, 2
+                    )
+                },
             },
             "opponent_towers": {
-                "opponent_left": {"health_percent": round(state.numbers.left_enemy_princess_hp.number * 100, 2)},
+                "opponent_left": {
+                    "health_percent": round(
+                        state.numbers.left_enemy_princess_hp.number * 100, 2
+                    )
+                },
                 "opponent_king": {"health_percent": 100.0},
-                "opponent_right": {"health_percent": round(state.numbers.right_enemy_princess_hp.number * 100, 2)},
+                "opponent_right": {
+                    "health_percent": round(
+                        state.numbers.right_enemy_princess_hp.number * 100, 2
+                    )
+                },
             },
             "hand_cards": [
-                f"{self._normalize_name(card.name)}-in-hand" for card in state.cards[1:5]
+                f"{self._normalize_name(card.name)}-in-hand"
+                for card in state.cards[1:5]
             ],
         }
