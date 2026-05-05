@@ -2,18 +2,12 @@
 Image stream widget for displaying game frames.
 """
 
-from typing import TYPE_CHECKING
-
 from PyQt6.QtGui import QImage
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
-
-if TYPE_CHECKING:
-    import numpy as np
-
 
 class ImageStreamWindow(QWidget):
     """

@@ -131,6 +131,7 @@ def set_styles(window) -> None:
             border: 1px solid #45475a;
             selection-background-color: #89b4fa;
             selection-color: #11111b;
+            outline: none;
         }
 
         QGroupBox {

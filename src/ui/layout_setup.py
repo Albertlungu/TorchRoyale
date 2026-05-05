@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
 from src.ui.gameplay_widget import ImageStreamWindow
+from src.ui.strategy_tab import _build_strategy_tab
 from src.ui.utils import AppConfig
 from src.ui.utils import save_config
 
@@ -415,7 +416,7 @@ def setup_tabs(
     QCheckBox,
 ]:
     """
-    Create the simplified dashboard and settings tabs.
+    Create the dashboard, strategy, and settings tabs.
 
     Args:
         main_window (MainWindow): The main window instance whose config and
@@ -423,7 +424,7 @@ def setup_tabs(
 
     Returns:
         tuple containing:
-            - QTabWidget: A tab widget containing Dashboard and Settings tabs.
+            - QTabWidget: A tab widget containing Dashboard, Strategy, and Settings tabs.
             - ImageStreamWindow: The live image stream widget.
             - QTextEdit: The runtime log display.
             - QLabel: Dashboard status value label.
@@ -448,6 +449,9 @@ def setup_tabs(
         dashboard_visualizer_value,
     ) = _build_dashboard_tab(main_window)
     tab_widget.addTab(dashboard_tab, "Dashboard")
+
+    strategy_tab = _build_strategy_tab(main_window)
+    tab_widget.addTab(strategy_tab, "Strategy")
 
     (
         settings_tab,
