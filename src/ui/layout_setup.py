@@ -3,6 +3,10 @@ UI layout setup for TorchRoyale main window.
 
 Defines the top bar and the simplified dashboard/settings interface.
 """
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QCheckBox
@@ -22,7 +26,11 @@ from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
 from src.ui.gameplay_widget import ImageStreamWindow
+from src.ui.utils import AppConfig
 from src.ui.utils import save_config
+
+if TYPE_CHECKING:
+    from src.ui.main_window import MainWindow
 
 
 def _wrap_section(title: str, description: str, widget: QWidget) -> QFrame:
@@ -80,7 +88,7 @@ def _make_read_only_field(label_text: str, value_widget: QWidget) -> QWidget:
     return container
 
 
-def setup_top_bar(main_window: object) -> tuple[QFrame, QPushButton, QPushButton, QLabel]:
+def setup_top_bar(main_window: MainWindow) -> tuple[QFrame, QPushButton, QPushButton, QLabel]:  # type: ignore[type-arg]
     """
     Create the top bar with title, status, and transport controls.
 
@@ -139,7 +147,7 @@ def setup_top_bar(main_window: object) -> tuple[QFrame, QPushButton, QPushButton
 
 
 def _build_dashboard_tab(
-    main_window: object,
+    main_window: MainWindow,
 ) -> tuple[QWidget, ImageStreamWindow, QTextEdit, QLabel, QLabel]:
     """
     Build the Dashboard tab with live overlay, quick controls, and runtime log.
@@ -225,7 +233,7 @@ def _build_dashboard_tab(
 
 
 def _build_settings_tab(
-    main_window: object,
+    main_window: MainWindow,
 ) -> tuple[
     QWidget,
     QLineEdit,
@@ -389,7 +397,7 @@ def _build_settings_tab(
 
 
 def setup_tabs(
-    main_window: object,
+    main_window: MainWindow,
 ) -> tuple[
     QTabWidget,
     ImageStreamWindow,

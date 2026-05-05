@@ -2,13 +2,42 @@
 
 from pathlib import Path
 from typing import Optional
+from typing import TypedDict
 
 import yaml
 
 
+class AdbConfig(TypedDict):
+    ip: str
+    device_serial: str
+
+
+class BotConfig(TypedDict):
+    auto_start_game: bool
+    load_deck: bool
+    log_level: str
+
+
+class IngameConfig(TypedDict):
+    play_action: float
+
+
+class VisualsConfig(TypedDict):
+    save_images: bool
+    save_labels: bool
+    show_images: bool
+
+
+class AppConfig(TypedDict):
+    adb: AdbConfig
+    bot: BotConfig
+    ingame: IngameConfig
+    visuals: VisualsConfig
+
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "configs" / "app_config.yaml"
-DEFAULT_CONFIG: dict[str, object] = {
+DEFAULT_CONFIG: AppConfig = {
     "adb": {"ip": "127.0.0.1", "device_serial": ""},
     "bot": {
         "auto_start_game": False,
@@ -24,17 +53,17 @@ DEFAULT_CONFIG: dict[str, object] = {
 }
 
 
-def _merge_defaults(config: Optional[dict[str, object]]) -> dict[str, object]:
+def _merge_defaults(config: Optional[AppConfig]) -> AppConfig:
     """
     Merge user config with default config values.
 
     Args:
-        config (Optional[dict[str, object]]): User-provided config to merge (may be None).
+        config (Optional[AppConfig]): User-provided config to merge (may be None).
 
     Returns:
-        dict[str, object]: Merged config with defaults filled in where missing.
+        AppConfig: Merged config with defaults filled in where missing.
     """
-    merged: dict[str, object] = {
+    merged: AppConfig = {
         section: values.copy() if isinstance(values, dict) else values
         for section, values in DEFAULT_CONFIG.items()
     }
@@ -48,7 +77,7 @@ def _merge_defaults(config: Optional[dict[str, object]]) -> dict[str, object]:
     return merged
 
 
-def load_config() -> dict[str, object]:
+def load_config() -> AppConfig:
     """
     Load UI config from `configs/app_config.yaml`.
 
@@ -56,7 +85,7 @@ def load_config() -> dict[str, object]:
         None
 
     Returns:
-        dict[str, object]: Configuration dictionary with defaults merged in.
+        AppConfig: Configuration dictionary with defaults merged in.
     """
     if not CONFIG_PATH.exists():
         return _merge_defaults(None)
@@ -64,12 +93,12 @@ def load_config() -> dict[str, object]:
         return _merge_defaults(yaml.safe_load(file))
 
 
-def save_config(config: dict[str, object]) -> None:
+def save_config(config: AppConfig) -> None:
     """
     Persist UI config to `configs/app_config.yaml`.
 
     Args:
-        config (dict[str, object]): Configuration dictionary to save.
+        config (AppConfig): Configuration dictionary to save.
     Returns:
         None
     """

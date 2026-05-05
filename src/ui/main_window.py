@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from threading import Thread
 from typing import Optional
+from typing import Protocol
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QCheckBox
@@ -19,17 +20,26 @@ from src.ui.gameplay_widget import ImageStreamWindow
 from src.ui.layout_setup import setup_tabs
 from src.ui.layout_setup import setup_top_bar
 from src.ui.styles import set_styles
+from src.ui.utils import AppConfig
+
+
+class BotProtocol(Protocol):
+    """Protocol for bot instances created by bot_factory."""
+
+    def run(self) -> None: ...
+    def stop(self) -> None: ...
+    def pause_or_resume(self) -> None: ...
 
 
 class MainWindow(QMainWindow):
     """
-    Main application window for TorchRoyAle.
+    Main application window for TorchRoyale.
 
     Attributes:
-        config: Application configuration dictionary.
-        actions: Action handlers for the bot (currently unused).
-        bot_factory: Factory to create bot instances.
-        bot: The running bot instance.
+        config (AppConfig): Application configuration dictionary.
+        actions (Optional[list[type]]): Action handler classes for the bot (currently unused).
+        bot_factory (Optional[Callable[..., Optional[BotProtocol]]]): Factory to create bot instances.
+        bot (Optional[BotProtocol]): The running bot instance.
         bot_thread (Optional[Thread]): Thread running the bot.
         is_running (bool): Whether the bot is currently running.
         log_message (pyqtSignal): Signal for emitting log messages to the UI.
@@ -56,44 +66,25 @@ class MainWindow(QMainWindow):
 
     def __init__(
         self,
-        config: dict[str, object],
-        actions: Optional[object] = None,
-        bot_factory: Optional[Callable[..., object]] = None,
+        config: AppConfig,
+        actions: Optional[list[type]] = None,
+        bot_factory: Optional[Callable[..., Optional[BotProtocol]]] = None,
     ) -> None:
         """
         Initialize the main window with config and optional bot factory.
 
         Args:
             config: Application configuration.
-            actions: Action handlers (unused, kept for compatibility).
+            actions: Action handler classes (unused, kept for compatibility).
             bot_factory: Factory to create bot instances.
         Returns:
             None
         """
-
-    log_message = pyqtSignal(str)
-
-    def __init__(
-        self,
-        config: dict[str, object],
-        actions: Optional[object] = None,
-        bot_factory: Optional[Callable[..., object]] = None,
-    ) -> None:
-        """
-        Initialize the main window with config and optional bot factory.
-
-        Args:
-            config (dict[str, object]): Application configuration.
-            actions (Optional[object]): Action handlers (unused, kept for compatibility).
-            bot_factory (Optional[Callable[..., object]]): Factory to create bot instances.
-        Returns:
-            None
-        """
         super().__init__()
-        self.config = config
-        self.actions = actions
-        self.bot_factory = bot_factory
-        self.bot: Optional[object] = None
+        self.config: AppConfig = config
+        self.actions: Optional[list[type]] = actions
+        self.bot_factory: Optional[Callable[..., Optional[BotProtocol]]] = bot_factory
+        self.bot: Optional[BotProtocol] = None
         self.bot_thread: Optional[Thread] = None
         self.is_running = False
 
@@ -278,13 +269,13 @@ class MainWindow(QMainWindow):
         self.update_config()
         self.start_bot()
 
-    def update_config(self) -> dict[str, object]:
+    def update_config(self) -> AppConfig:
         """
         Update the config dictionary from current UI widget values.
         Args:
             None
         Returns:
-            The updated configuration dictionary.
+            AppConfig: The updated configuration dictionary.
         """
         self.config.setdefault("visuals", {})
         self.config.setdefault("bot", {})
@@ -310,13 +301,15 @@ class MainWindow(QMainWindow):
         self.config["adb"]["device_serial"] = self.device_serial_input.text()
         return self.config
 
-    def _build_bot_instance(self) -> object:
+    def _build_bot_instance(self) -> Optional[BotProtocol]:
         """
         Build a bot instance using the bot factory.
+
         Args:
             None
+
         Returns:
-            The created bot instance.
+            The created bot instance, or None if creation fails.
         """
         try:
             return self.bot_factory(
@@ -339,7 +332,7 @@ class MainWindow(QMainWindow):
             None
         """
         try:
-            self.bot = self._build_bot_instance()
+            self.bot: Optional[BotProtocol] = self._build_bot_instance()
             visualizer = getattr(self.bot, "visualizer", None)
             frame_ready = getattr(visualizer, "frame_ready", None)
             if frame_ready is not None and hasattr(frame_ready, "connect"):
