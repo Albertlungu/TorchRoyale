@@ -1,0 +1,936 @@
+{
+  "hog-rider": {
+    "counters": [
+      "cannon",
+      "tesla",
+      "inferno-tower",
+      "bomb-tower",
+      "goblin-cage",
+      "tombstone",
+      "mini-pekka",
+      "barbarians"
+    ],
+    "counter_to_counter": {
+      "cannon": ["fireball", "earthquake"],
+      "tesla": ["fireball", "earthquake"],
+      "inferno-tower": ["earthquake", "lightning"],
+      "bomb-tower": ["fireball", "earthquake"],
+      "goblin-cage": ["fireball", "log"],
+      "tombstone": ["log", "fireball"],
+      "mini-pekka": ["skeletons", "ice-spirit", "ice-golem"],
+      "barbarians": ["fireball", "log"]
+    }
+  },
+  "musketeer": {
+    "counters": [
+      "fireball",
+      "lightning",
+      "poison",
+      "rocket",
+      "knight",
+      "valkyrie",
+      "minions",
+      "skeleton-army"
+    ],
+    "counter_to_counter": {
+      "fireball": [],
+      "lightning": [],
+      "poison": [],
+      "rocket": [],
+      "knight": ["musketeer", "skeletons", "ice-spirit"],
+      "valkyrie": ["musketeer", "minions"],
+      "minions": ["ice-spirit", "fireball"],
+      "skeleton-army": ["log", "fireball"]
+    }
+  },
+  "cannon": {
+    "counters": ["lightning", "earthquake", "fireball", "tank+support"],
+    "counter_to_counter": {
+      "lightning": [],
+      "earthquake": [],
+      "fireball": [],
+      "tank+support": ["cannon", "musketeer"]
+    }
+  },
+  "ice-golem": {
+    "counters": ["knight", "mini-pekka", "musketeer", "any-dps"],
+    "counter_to_counter": {
+      "knight": ["musketeer", "skeletons"],
+      "mini-pekka": ["skeletons", "ice-spirit"],
+      "musketeer": ["fireball"],
+      "any-dps": ["ice-golem-kite"]
+    }
+  },
+  "skeletons": {
+    "counters": ["log", "zap", "arrows", "splash"],
+    "counter_to_counter": {
+      "log": ["bait", "outcycle"],
+      "zap": ["bait", "outcycle"],
+      "arrows": ["bait", "outcycle"],
+      "splash": ["ice-golem", "hog-rider-pressure"]
+    }
+  },
+  "ice-spirit": {
+    "counters": ["any-troop", "spells"],
+    "counter_to_counter": {
+      "any-troop": ["cycle"],
+      "spells": ["cycle", "force-inefficient-response"]
+    }
+  },
+  "fireball": {
+    "counters": ["spread", "high-hp", "bait"],
+    "counter_to_counter": {
+      "spread": ["prediction"],
+      "high-hp": ["musketeer", "hog-rider"],
+      "bait": ["outcycle", "pressure"]
+    }
+  },
+  "the-log": {
+    "counters": ["air", "spread", "high-hp-ground"],
+    "counter_to_counter": {
+      "air": ["musketeer", "minions"],
+      "spread": ["prediction"],
+      "high-hp-ground": ["musketeer", "cannon"]
+    }
+  },
+  "knight": {
+    "counters": [
+      "mini-pekka",
+      "pekka",
+      "inferno-tower",
+      "valkyrie",
+      "musketeer",
+      "prince"
+    ],
+    "counter_to_counter": {
+      "mini-pekka": ["skeletons", "ice-spirit"],
+      "pekka": ["kite", "swarm"],
+      "inferno-tower": ["zap", "electro-spirit"],
+      "valkyrie": ["air-units", "ranged"],
+      "musketeer": ["fireball", "log-bait"],
+      "prince": ["skeletons", "ice-golem"]
+    }
+  },
+
+  "archers": {
+    "counters": ["fireball", "arrows", "log", "valkyrie", "wizard"],
+    "counter_to_counter": {
+      "fireball": ["split-lane"],
+      "arrows": ["split-lane"],
+      "log": ["placement"],
+      "valkyrie": ["kite"],
+      "wizard": ["pressure"]
+    }
+  },
+
+  "giant": {
+    "counters": [
+      "inferno-tower",
+      "inferno-dragon",
+      "pekka",
+      "mini-pekka",
+      "musketeer",
+      "tombstone"
+    ],
+    "counter_to_counter": {
+      "inferno-tower": ["zap", "lightning"],
+      "inferno-dragon": ["electro-wizard", "reset"],
+      "pekka": ["swarm-support"],
+      "mini-pekka": ["kite", "swarm"],
+      "musketeer": ["fireball"],
+      "tombstone": ["poison"]
+    }
+  },
+
+  "baby-dragon": {
+    "counters": [
+      "inferno-tower",
+      "musketeer",
+      "archers",
+      "hunter",
+      "electro-wizard"
+    ],
+    "counter_to_counter": {
+      "inferno-tower": ["lightning"],
+      "musketeer": ["fireball"],
+      "archers": ["fireball"],
+      "hunter": ["spacing"],
+      "electro-wizard": ["reset"]
+    }
+  },
+
+  "valkyrie": {
+    "counters": [
+      "mini-pekka",
+      "pekka",
+      "inferno-tower",
+      "air-units",
+      "ranged-units"
+    ],
+    "counter_to_counter": {
+      "mini-pekka": ["skeletons"],
+      "pekka": ["kite", "support"],
+      "inferno-tower": ["zap"],
+      "air-units": ["musketeer"],
+      "ranged-units": ["pressure"]
+    }
+  },
+
+  "wizard": {
+    "counters": ["fireball", "rocket", "lightning", "mini-pekka", "knight"],
+    "counter_to_counter": {
+      "fireball": ["bait"],
+      "rocket": ["bait"],
+      "lightning": ["split"],
+      "mini-pekka": ["skeletons"],
+      "knight": ["support-troops"]
+    }
+  },
+
+  "minions": {
+    "counters": ["arrows", "zap", "fireball", "wizard", "electro-wizard"],
+    "counter_to_counter": {
+      "arrows": ["split"],
+      "zap": ["spacing"],
+      "fireball": ["split"],
+      "wizard": ["pressure"],
+      "electro-wizard": ["spread"]
+    }
+  },
+
+  "goblins": {
+    "counters": ["log", "zap", "arrows", "splash-damage", "valkyrie"],
+    "counter_to_counter": {
+      "log": ["bait"],
+      "zap": ["bait"],
+      "arrows": ["split"],
+      "splash-damage": ["swarm-pressure"],
+      "valkyrie": ["kite"]
+    }
+  },
+
+  "spear-goblins": {
+    "counters": ["log", "arrows", "fireball", "wizard", "valkyrie"],
+    "counter_to_counter": {
+      "log": ["split-pressure"],
+      "arrows": ["spacing"],
+      "fireball": ["bait"],
+      "wizard": ["pressure"],
+      "valkyrie": ["kite"]
+    }
+  },
+
+  "bomber": {
+    "counters": ["archers", "musketeer", "fireball", "minions", "air-units"],
+    "counter_to_counter": {
+      "archers": ["range"],
+      "musketeer": ["fireball"],
+      "fireball": ["bait"],
+      "minions": ["zap"],
+      "air-units": ["support"]
+    }
+  },
+
+  "giant-skeleton": {
+    "counters": [
+      "pekka",
+      "mini-pekka",
+      "inferno-tower",
+      "inferno-dragon",
+      "kite"
+    ],
+    "counter_to_counter": {
+      "pekka": ["support"],
+      "mini-pekka": ["swarm"],
+      "inferno-tower": ["lightning"],
+      "inferno-dragon": ["electro-wizard"],
+      "kite": ["bridge-pressure"]
+    }
+  },
+
+  "princess": {
+    "counters": ["log", "arrows", "fireball", "miner", "knight"],
+    "counter_to_counter": {
+      "log": ["split-lane"],
+      "arrows": ["spacing"],
+      "fireball": ["bait"],
+      "miner": ["tower-focus"],
+      "knight": ["kite"]
+    }
+  },
+
+  "balloon": {
+    "counters": ["musketeer", "archers", "minions", "inferno-tower", "tesla"],
+    "counter_to_counter": {
+      "musketeer": ["freeze"],
+      "archers": ["snowball"],
+      "minions": ["zap"],
+      "inferno-tower": ["reset"],
+      "tesla": ["freeze"]
+    }
+  },
+
+  "pekka": {
+    "counters": [
+      "swarm",
+      "kite",
+      "air-units",
+      "inferno-dragon",
+      "inferno-tower"
+    ],
+    "counter_to_counter": {
+      "swarm": ["zap"],
+      "kite": ["bridge-pressure"],
+      "air-units": ["support"],
+      "inferno-dragon": ["reset"],
+      "inferno-tower": ["lightning"]
+    }
+  },
+  "miner": {
+    "counters": [
+      "knight",
+      "mini-pekka",
+      "skeletons",
+      "ice-golem",
+      "musketeer",
+      "tombstone"
+    ],
+    "counter_to_counter": {
+      "knight": ["bait", "chip-pressure"],
+      "mini-pekka": ["skeletons", "ice-spirit"],
+      "skeletons": ["zap", "log"],
+      "ice-golem": ["support-follow-up"],
+      "musketeer": ["fireball"],
+      "tombstone": ["poison"]
+    }
+  },
+
+  "royal-giant": {
+    "counters": [
+      "inferno-tower",
+      "inferno-dragon",
+      "pekka",
+      "mini-pekka",
+      "hunter",
+      "tesla"
+    ],
+    "counter_to_counter": {
+      "inferno-tower": ["lightning", "zap"],
+      "inferno-dragon": ["electro-wizard"],
+      "pekka": ["kite-support"],
+      "mini-pekka": ["swarm"],
+      "hunter": ["spacing"],
+      "tesla": ["earthquake"]
+    }
+  },
+
+  "electro-wizard": {
+    "counters": ["fireball", "poison", "rocket", "mini-pekka", "knight"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "rocket": ["bait"],
+      "mini-pekka": ["skeletons"],
+      "knight": ["support-troops"]
+    }
+  },
+
+  "mega-minion": {
+    "counters": [
+      "musketeer",
+      "archers",
+      "fireball",
+      "minions",
+      "electro-wizard"
+    ],
+    "counter_to_counter": {
+      "musketeer": ["spacing"],
+      "archers": ["fireball"],
+      "fireball": ["bait"],
+      "minions": ["zap"],
+      "electro-wizard": ["split"]
+    }
+  },
+
+  "lava-hound": {
+    "counters": [
+      "musketeer",
+      "archers",
+      "minions",
+      "inferno-dragon",
+      "inferno-tower",
+      "electro-wizard"
+    ],
+    "counter_to_counter": {
+      "musketeer": ["fireball"],
+      "archers": ["split"],
+      "minions": ["zap"],
+      "inferno-dragon": ["reset"],
+      "inferno-tower": ["lightning"],
+      "electro-wizard": ["cycle-pressure"]
+    }
+  },
+
+  "inferno-dragon": {
+    "counters": ["electro-wizard", "zap", "freeze", "musketeer", "archers"],
+    "counter_to_counter": {
+      "electro-wizard": ["reset-immunity"],
+      "zap": ["recharge-reset"],
+      "freeze": ["timing"],
+      "musketeer": ["fireball"],
+      "archers": ["split"]
+    }
+  },
+
+  "tornado": {
+    "counters": ["split-push", "bridge-spam", "bait-decks", "cycle-pressure"],
+    "counter_to_counter": {
+      "split-push": ["overwhelm"],
+      "bridge-spam": ["predictive-placements"],
+      "bait-decks": ["outcycle"],
+      "cycle-pressure": ["tank-pressure"]
+    }
+  },
+
+  "poison": {
+    "counters": ["high-cost-cycle", "spread-decks", "fast-pressure"],
+    "counter_to_counter": {
+      "high-cost-cycle": ["pressure"],
+      "spread-decks": ["focus-lane"],
+      "fast-pressure": ["tank-push"]
+    }
+  },
+
+  "rage": {
+    "counters": ["kite", "freeze", "defensive-building", "air-control"],
+    "counter_to_counter": {
+      "kite": ["bridge-pressure"],
+      "freeze": ["timing"],
+      "defensive-building": ["spell-cycle"],
+      "air-control": ["split-pressure"]
+    }
+  },
+
+  "graveyard": {
+    "counters": ["baby-dragon", "valkyrie", "bowler", "poison", "executioner"],
+    "counter_to_counter": {
+      "baby-dragon": ["tank-out"],
+      "valkyrie": ["kite"],
+      "bowler": ["split-lane"],
+      "poison": ["split-pressure"],
+      "executioner": ["spacing"]
+    }
+  },
+
+  "x-bow": {
+    "counters": [
+      "rocket",
+      "fireball",
+      "earthquake",
+      "miner",
+      "balloon",
+      "pekka"
+    ],
+    "counter_to_counter": {
+      "rocket": ["cycle-pressure"],
+      "fireball": ["outcycle"],
+      "earthquake": ["pressure"],
+      "miner": ["tower-focus"],
+      "balloon": ["defense-split"],
+      "pekka": ["kite"]
+    }
+  },
+
+  "mortar": {
+    "counters": ["earthquake", "fireball", "miner", "hog-rider", "pekka"],
+    "counter_to_counter": {
+      "earthquake": ["split-defense"],
+      "fireball": ["pressure"],
+      "miner": ["prediction"],
+      "hog-rider": ["building"],
+      "pekka": ["kite"]
+    }
+  },
+
+  "goblin-barrel": {
+    "counters": ["log", "zap", "arrows", "tornado", "knight"],
+    "counter_to_counter": {
+      "log": ["bait"],
+      "zap": ["bait-cycle"],
+      "arrows": ["split"],
+      "tornado": ["placement-mixup"],
+      "knight": ["prediction"]
+    }
+  },
+
+  "elite-barbarians": {
+    "counters": [
+      "pekka",
+      "mini-pekka",
+      "valkyrie",
+      "skeleton-army",
+      "ice-golem"
+    ],
+    "counter_to_counter": {
+      "pekka": ["kite"],
+      "mini-pekka": ["swarm"],
+      "valkyrie": ["spacing"],
+      "skeleton-army": ["zap"],
+      "ice-golem": ["kite"]
+    }
+  },
+
+  "battle-ram": {
+    "counters": [
+      "valkyrie",
+      "mini-pekka",
+      "pekka",
+      "inferno-tower",
+      "skeleton-army"
+    ],
+    "counter_to_counter": {
+      "valkyrie": ["kite"],
+      "mini-pekka": ["swarm"],
+      "pekka": ["support"],
+      "inferno-tower": ["zap"],
+      "skeleton-army": ["log"]
+    }
+  },
+
+  "log": {
+    "counters": [
+      "princess",
+      "skeletons",
+      "goblin-barrel",
+      "bats",
+      "spear-goblins"
+    ],
+    "counter_to_counter": {
+      "princess": ["spacing", "bridge-pressure"],
+      "skeletons": ["cycle"],
+      "goblin-barrel": ["prediction"],
+      "bats": ["zap-resistance"],
+      "spear-goblins": ["split-pressure"]
+    }
+  },
+
+  "zap": {
+    "counters": [
+      "skeleton-army",
+      "bats",
+      "inferno-dragon-reset",
+      "sparky-charge"
+    ],
+    "counter_to_counter": {
+      "skeleton-army": ["bait-cycle"],
+      "bats": ["split"],
+      "inferno-dragon-reset": ["timing"],
+      "sparky-charge": ["reset-cycle"]
+    }
+  },
+
+  "arrows": {
+    "counters": ["minion-horde", "princess", "dart-goblin", "bats"],
+    "counter_to_counter": {
+      "minion-horde": ["split-pressure"],
+      "princess": ["spacing"],
+      "dart-goblin": ["cycle-pressure"],
+      "bats": ["cycle"]
+    }
+  },
+
+  "lightning": {
+    "counters": [
+      "high-cost-buildings",
+      "support-troops",
+      "musketeer",
+      "three-musketeers"
+    ],
+    "counter_to_counter": {
+      "high-cost-buildings": ["split-lane-pressure"],
+      "support-troops": ["cycle"],
+      "musketeer": ["bait-spacing"],
+      "three-musketeers": ["split-push"]
+    }
+  },
+
+  "rocket": {
+    "counters": ["low-value-cycle", "bait-decks", "swarms", "three-musketeers"],
+    "counter_to_counter": {
+      "low-value-cycle": ["pressure"],
+      "bait-decks": ["split-lane"],
+      "swarms": ["spread"],
+      "three-musketeers": ["split-pressure"]
+    }
+  },
+
+  "tesla": {
+    "counters": ["earthquake", "lightning", "miner", "royal-giant", "balloon"],
+    "counter_to_counter": {
+      "earthquake": ["split-defense"],
+      "lightning": ["cycle-pressure"],
+      "miner": ["prediction"],
+      "royal-giant": ["kite-support"],
+      "balloon": ["freeze-cycle"]
+    }
+  },
+
+  "inferno-tower": {
+    "counters": ["zap", "electro-spirit", "lightning", "earthquake", "freeze"],
+    "counter_to_counter": {
+      "zap": ["recharge-reset"],
+      "electro-spirit": ["cycle-reset"],
+      "lightning": ["split-lane"],
+      "earthquake": ["pressure"],
+      "freeze": ["timing"]
+    }
+  },
+
+  "bomb-tower": {
+    "counters": ["earthquake", "lightning", "miner", "royal-giant"],
+    "counter_to_counter": {
+      "earthquake": ["split-pressure"],
+      "lightning": ["cycle"],
+      "miner": ["prediction"],
+      "royal-giant": ["kite"]
+    }
+  },
+
+  "goblin-cage": {
+    "counters": ["fireball", "earthquake", "poison", "pekka", "mini-pekka"],
+    "counter_to_counter": {
+      "fireball": ["bait-cycle"],
+      "earthquake": ["split"],
+      "poison": ["pressure"],
+      "pekka": ["support"],
+      "mini-pekka": ["swarm"]
+    }
+  },
+
+  "tombstone": {
+    "counters": [
+      "poison",
+      "fireball",
+      "executioner",
+      "valkyrie",
+      "baby-dragon"
+    ],
+    "counter_to_counter": {
+      "poison": ["split-lane"],
+      "fireball": ["cycle"],
+      "executioner": ["spacing"],
+      "valkyrie": ["kite"],
+      "baby-dragon": ["air-support"]
+    }
+  },
+
+  "hunter": {
+    "counters": ["fireball", "poison", "minions", "archers"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "minions": ["zap"],
+      "archers": ["spacing"]
+    }
+  },
+
+  "dart-goblin": {
+    "counters": ["log", "arrows", "fireball", "valkyrie", "knight"],
+    "counter_to_counter": {
+      "log": ["placement"],
+      "arrows": ["split"],
+      "fireball": ["bait"],
+      "valkyrie": ["kite"],
+      "knight": ["cycle-pressure"]
+    }
+  },
+
+  "bats": {
+    "counters": ["zap", "arrows", "splash-damage", "fire-spirit"],
+    "counter_to_counter": {
+      "zap": ["cycle"],
+      "arrows": ["split"],
+      "splash-damage": ["spacing"],
+      "fire-spirit": ["bait"]
+    }
+  },
+
+  "ice-wizard": {
+    "counters": ["fireball", "poison", "rocket", "mini-pekka"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "rocket": ["bait"],
+      "mini-pekka": ["kite"]
+    }
+  },
+
+  "executioner": {
+    "counters": ["fireball", "rocket", "poison", "miner", "bait-decks"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "rocket": ["cycle"],
+      "poison": ["pressure"],
+      "miner": ["prediction"],
+      "bait-decks": ["outcycle"]
+    }
+  },
+  "skeleton-dragons": {
+    "counters": [
+      "fireball",
+      "archers",
+      "musketeer",
+      "minions",
+      "electro-wizard"
+    ],
+    "counter_to_counter": {
+      "fireball": ["split-positioning"],
+      "archers": ["spacing"],
+      "musketeer": ["cycle-pressure"],
+      "minions": ["zap"],
+      "electro-wizard": ["reset-immunity"]
+    }
+  },
+
+  "firecracker": {
+    "counters": ["log", "arrows", "fireball", "miner", "balloon"],
+    "counter_to_counter": {
+      "log": ["knockback-spacing"],
+      "arrows": ["split-lane"],
+      "fireball": ["bait"],
+      "miner": ["tower-focus"],
+      "balloon": ["anti-air"]
+    }
+  },
+
+  "electro-spirit": {
+    "counters": ["any-splash", "prediction", "tornado"],
+    "counter_to_counter": {
+      "any-splash": ["spacing"],
+      "prediction": ["cycle-outplay"],
+      "tornado": ["split-pressure"]
+    }
+  },
+
+  "heal-spirit": {
+    "counters": ["log", "arrows", "zap", "fireball"],
+    "counter_to_counter": {
+      "log": ["cycle"],
+      "arrows": ["split"],
+      "zap": ["timing"],
+      "fireball": ["bait"]
+    }
+  },
+
+  "guards": {
+    "counters": ["fireball", "poison", "splash", "valkyrie", "baby-dragon"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "splash": ["spacing"],
+      "valkyrie": ["kite"],
+      "baby-dragon": ["air-support"]
+    }
+  },
+
+  "wall-breakers": {
+    "counters": ["log", "bomb-tower", "tombstone", "skeletons", "valkyrie"],
+    "counter_to_counter": {
+      "log": ["split-pressure"],
+      "bomb-tower": ["prediction"],
+      "tombstone": ["cycle-pressure"],
+      "skeletons": ["zap"],
+      "valkyrie": ["kite"]
+    }
+  },
+
+  "rascals": {
+    "counters": ["fireball", "poison", "valkyrie", "bowler"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "valkyrie": ["kite"],
+      "bowler": ["spacing"]
+    }
+  },
+
+  "zappies": {
+    "counters": ["fireball", "poison", "lightning", "miner"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "lightning": ["spread"],
+      "miner": ["prediction"]
+    }
+  },
+
+  "goblin-gang": {
+    "counters": ["log", "zap", "arrows", "fireball", "valkyrie"],
+    "counter_to_counter": {
+      "log": ["bait"],
+      "zap": ["cycle"],
+      "arrows": ["split"],
+      "fireball": ["pressure"],
+      "valkyrie": ["kite"]
+    }
+  },
+
+  "royal-recruits": {
+    "counters": ["earthquake", "fireball", "lightning", "pekka", "mini-pekka"],
+    "counter_to_counter": {
+      "earthquake": ["split-pressure"],
+      "fireball": ["cycle"],
+      "lightning": ["value-hit"],
+      "pekka": ["kite-support"],
+      "mini-pekka": ["swarm"]
+    }
+  },
+
+  "flying-machine": {
+    "counters": ["fireball", "arrows", "musketeer", "electro-wizard"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "arrows": ["spacing"],
+      "musketeer": ["cycle"],
+      "electro-wizard": ["reset"]
+    }
+  },
+
+  "royal-hogs": {
+    "counters": ["bomb-tower", "cannon", "valkyrie", "executioner", "tornado"],
+    "counter_to_counter": {
+      "bomb-tower": ["earthquake"],
+      "cannon": ["earthquake"],
+      "valkyrie": ["kite"],
+      "executioner": ["split-pressure"],
+      "tornado": ["spacing"]
+    }
+  },
+
+  "three-musketeers": {
+    "counters": ["fireball", "rocket", "lightning", "poison"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "rocket": ["cycle"],
+      "lightning": ["value-split"],
+      "poison": ["pressure"]
+    }
+  },
+
+  "elixir-golem": {
+    "counters": [
+      "pekka",
+      "mini-pekka",
+      "inferno-tower",
+      "inferno-dragon",
+      "bowler"
+    ],
+    "counter_to_counter": {
+      "pekka": ["kite-support"],
+      "mini-pekka": ["swarm"],
+      "inferno-tower": ["lightning"],
+      "inferno-dragon": ["reset"],
+      "bowler": ["split-pressure"]
+    }
+  },
+
+  "battle-healer": {
+    "counters": ["poison", "inferno-dragon", "pekka", "air-units"],
+    "counter_to_counter": {
+      "poison": ["cycle-pressure"],
+      "inferno-dragon": ["reset"],
+      "pekka": ["kite"],
+      "air-units": ["ranged-support"]
+    }
+  },
+
+  "ram-rider": {
+    "counters": ["inferno-tower", "mini-pekka", "pekka", "valkyrie"],
+    "counter_to_counter": {
+      "inferno-tower": ["zap"],
+      "mini-pekka": ["swarm"],
+      "pekka": ["kite"],
+      "valkyrie": ["spacing"]
+    }
+  },
+
+  "mother-witch": {
+    "counters": ["fireball", "poison", "lightning", "miner"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "lightning": ["value-trade"],
+      "miner": ["prediction"]
+    }
+  },
+
+  "electro-dragon": {
+    "counters": ["lightning", "rocket", "musketeer", "archers"],
+    "counter_to_counter": {
+      "lightning": ["cycle"],
+      "rocket": ["bait"],
+      "musketeer": ["split"],
+      "archers": ["spacing"]
+    }
+  },
+
+  "bowler": {
+    "counters": ["air-units", "fireball", "poison", "musketeer"],
+    "counter_to_counter": {
+      "air-units": ["ranged"],
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "musketeer": ["pressure"]
+    }
+  },
+
+  "night-witch": {
+    "counters": ["fireball", "poison", "executioner", "baby-dragon"],
+    "counter_to_counter": {
+      "fireball": ["split"],
+      "poison": ["cycle"],
+      "executioner": ["spacing"],
+      "baby-dragon": ["air-support"]
+    }
+  },
+
+  "dark-prince": {
+    "counters": ["pekka", "mini-pekka", "valkyrie", "skeleton-army"],
+    "counter_to_counter": {
+      "pekka": ["kite"],
+      "mini-pekka": ["swarm"],
+      "valkyrie": ["spacing"],
+      "skeleton-army": ["zap"]
+    }
+  },
+
+  "prince": {
+    "counters": ["skeletons", "ice-spirit", "mini-pekka", "valkyrie"],
+    "counter_to_counter": {
+      "skeletons": ["zap"],
+      "ice-spirit": ["timing"],
+      "mini-pekka": ["kite"],
+      "valkyrie": ["spacing"]
+    }
+  },
+
+  "sparky": {
+    "counters": ["zap", "electro-spirit", "rocket", "reset-cycles"],
+    "counter_to_counter": {
+      "zap": ["timing"],
+      "electro-spirit": ["cycle-reset"],
+      "rocket": ["bait"],
+      "reset-cycles": ["pressure"]
+    }
+  },
+
+  "minion-horde": {
+    "counters": ["arrows", "fireball", "wizard", "executioner"],
+    "counter_to_counter": {
+      "arrows": ["split"],
+      "fireball": ["bait"],
+      "wizard": ["pressure"],
+      "executioner": ["spacing"]
+    }
+  }
+}
