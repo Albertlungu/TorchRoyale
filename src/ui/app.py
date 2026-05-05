@@ -10,6 +10,13 @@ from src.ui.utils import load_config
 
 
 def main() -> int:
+    """
+    Bootstrap and launch the TorchRoyale desktop application.
+    Args:
+        None
+    Returns:
+        int: Application exit code from QApplication.exec().
+    """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = MainWindow(load_config(), bot_factory=create_torchroyale_bot)
