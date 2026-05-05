@@ -6,9 +6,27 @@ from src.actions.generic.action import Action
 
 
 class AerialCoordination(Action):
-    """Strategic air unit deployment based on battlefield analysis."""
+    """
+    Strategic air unit deployment based on battlefield analysis.
 
-    def calculate_score(self, state):
+    Attributes:
+        CARD (Card): The card associated with this action.
+        tile_x (int): Grid column for the placement.
+        tile_y (int): Grid row for the placement.
+    """
+
+    def calculate_score(self, state) -> list:
+        """
+        Score aerial placement by proximity to enemy units.
+
+        Args:
+            state: Current game state with enemy detections and elixir count.
+
+        Returns:
+            list: Score components where the first element is the primary score
+                and the second (when present) is the negative distance to the
+                nearest enemy.
+        """
         score = [0.5] if state.numbers.elixir.number == 10 else [0]
         for detection in state.enemies:
             distance = math.hypot(
