@@ -3,7 +3,6 @@ Log handler for displaying log messages in the GUI.
 """
 
 import logging
-from typing import Any
 
 from PyQt6.QtCore import Q_ARG
 from PyQt6.QtCore import QMetaObject

@@ -1,9 +1,7 @@
 """Main window for the TorchRoyale desktop UI."""
 
+from collections.abc import Callable
 from threading import Thread
-from typing import Any
-from typing import Callable
-from typing import Dict
 from typing import Optional
 
 from PyQt6.QtCore import pyqtSignal
@@ -25,13 +23,13 @@ from src.ui.styles import set_styles
 
 class MainWindow(QMainWindow):
     """
-    Main application window for TorchRoyale.
+    Main application window for TorchRoyAle.
 
     Attributes:
-        config (Dict[str, Any]): Application configuration dictionary.
-        actions (Optional[Any]): Action handlers for the bot (currently unused).
-        bot_factory (Optional[Callable[..., Any]]): Factory to create bot instances.
-        bot (Optional[Any]): The running bot instance.
+        config: Application configuration dictionary.
+        actions: Action handlers for the bot (currently unused).
+        bot_factory: Factory to create bot instances.
+        bot: The running bot instance.
         bot_thread (Optional[Thread]): Thread running the bot.
         is_running (bool): Whether the bot is currently running.
         log_message (pyqtSignal): Signal for emitting log messages to the UI.
@@ -58,17 +56,36 @@ class MainWindow(QMainWindow):
 
     def __init__(
         self,
-        config: Dict[str, Any],
-        actions: Optional[Any] = None,
-        bot_factory: Optional[Callable[..., Any]] = None,
+        config: dict[str, object],
+        actions: Optional[object] = None,
+        bot_factory: Optional[Callable[..., object]] = None,
     ) -> None:
         """
         Initialize the main window with config and optional bot factory.
 
         Args:
-            config (Dict[str, Any]): Application configuration.
-            actions (Optional[Any]): Action handlers (unused, kept for compatibility).
-            bot_factory (Optional[Callable[..., Any]]): Factory to create bot instances.
+            config: Application configuration.
+            actions: Action handlers (unused, kept for compatibility).
+            bot_factory: Factory to create bot instances.
+        Returns:
+            None
+        """
+
+    log_message = pyqtSignal(str)
+
+    def __init__(
+        self,
+        config: dict[str, object],
+        actions: Optional[object] = None,
+        bot_factory: Optional[Callable[..., object]] = None,
+    ) -> None:
+        """
+        Initialize the main window with config and optional bot factory.
+
+        Args:
+            config (dict[str, object]): Application configuration.
+            actions (Optional[object]): Action handlers (unused, kept for compatibility).
+            bot_factory (Optional[Callable[..., object]]): Factory to create bot instances.
         Returns:
             None
         """
@@ -76,7 +93,7 @@ class MainWindow(QMainWindow):
         self.config = config
         self.actions = actions
         self.bot_factory = bot_factory
-        self.bot: Optional[Any] = None
+        self.bot: Optional[object] = None
         self.bot_thread: Optional[Thread] = None
         self.is_running = False
 
@@ -261,13 +278,13 @@ class MainWindow(QMainWindow):
         self.update_config()
         self.start_bot()
 
-    def update_config(self) -> Dict[str, Any]:
+    def update_config(self) -> dict[str, object]:
         """
         Update the config dictionary from current UI widget values.
         Args:
             None
         Returns:
-            Dict[str, Any]: The updated configuration dictionary.
+            The updated configuration dictionary.
         """
         self.config.setdefault("visuals", {})
         self.config.setdefault("bot", {})
@@ -293,13 +310,13 @@ class MainWindow(QMainWindow):
         self.config["adb"]["device_serial"] = self.device_serial_input.text()
         return self.config
 
-    def _build_bot_instance(self) -> Any:
+    def _build_bot_instance(self) -> object:
         """
         Build a bot instance using the bot factory.
         Args:
             None
         Returns:
-            Any: The created bot instance.
+            The created bot instance.
         """
         try:
             return self.bot_factory(

@@ -2,8 +2,6 @@
 Image stream widget for displaying game frames.
 """
 
-from typing import Any
-
 from PyQt6.QtGui import QImage
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
@@ -63,12 +61,12 @@ class ImageStreamWindow(QWidget):
         layout.addWidget(self.image)
         self.setLayout(layout)
 
-    def update_frame(self, annotated_image: Any) -> None:
+    def update_frame(self, annotated_image: object) -> None:
         """
         Update the displayed frame with a new annotated image.
 
         Args:
-            annotated_image (np.ndarray): The annotated image array (BGR/RGB format).
+            annotated_image: The annotated image array (BGR/RGB format).
         Returns:
             None
         """

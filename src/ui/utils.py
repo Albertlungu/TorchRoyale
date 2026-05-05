@@ -1,7 +1,6 @@
 """Utility functions for the TorchRoyale desktop UI."""
 
 from pathlib import Path
-from typing import Any
 from typing import Optional
 
 import yaml
@@ -9,7 +8,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "configs" / "app_config.yaml"
-DEFAULT_CONFIG: dict[str, Any] = {
+DEFAULT_CONFIG: dict[str, object] = {
     "adb": {"ip": "127.0.0.1", "device_serial": ""},
     "bot": {
         "auto_start_game": False,
@@ -25,17 +24,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
-def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _merge_defaults(config: Optional[dict[str, object]]) -> dict[str, object]:
     """
     Merge user config with default config values.
 
     Args:
-        config (Optional[dict[str, Any]]): User-provided config to merge (may be None).
+        config (Optional[dict[str, object]]): User-provided config to merge (may be None).
 
     Returns:
-        dict[str, Any]: Merged config with defaults filled in where missing.
+        dict[str, object]: Merged config with defaults filled in where missing.
     """
-    merged: dict[str, Any] = {
+    merged: dict[str, object] = {
         section: values.copy() if isinstance(values, dict) else values
         for section, values in DEFAULT_CONFIG.items()
     }
@@ -49,7 +48,7 @@ def _merge_defaults(config: Optional[dict[str, Any]]) -> dict[str, Any]:
     return merged
 
 
-def load_config() -> dict[str, Any]:
+def load_config() -> dict[str, object]:
     """
     Load UI config from `configs/app_config.yaml`.
 
@@ -57,7 +56,7 @@ def load_config() -> dict[str, Any]:
         None
 
     Returns:
-        dict[str, Any]: Configuration dictionary with defaults merged in.
+        dict[str, object]: Configuration dictionary with defaults merged in.
     """
     if not CONFIG_PATH.exists():
         return _merge_defaults(None)
@@ -65,12 +64,12 @@ def load_config() -> dict[str, Any]:
         return _merge_defaults(yaml.safe_load(file))
 
 
-def save_config(config: dict[str, Any]) -> None:
+def save_config(config: dict[str, object]) -> None:
     """
     Persist UI config to `configs/app_config.yaml`.
 
     Args:
-        config (dict[str, Any]): Configuration dictionary to save.
+        config (dict[str, object]): Configuration dictionary to save.
     Returns:
         None
     """
