@@ -4,7 +4,14 @@ Style definitions for the TorchRoyale GUI.
 
 
 def set_styles(window) -> None:
-    """Apply a Catppuccin-inspired theme to the main window."""
+    """
+    Apply a Catppuccin-inspired theme to the main window.
+
+    Args:
+        window (QMainWindow): The main window to apply styles to.
+    Returns:
+        None
+    """
     window.setStyleSheet(
         """
         QMainWindow {
