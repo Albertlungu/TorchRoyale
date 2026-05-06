@@ -1,12 +1,12 @@
-"""Musketeer play heuristics."""
+"""Musketeer strategic coordination module."""
 
 import math
 
-from src.actions.generic.action import Action
+from src.actions.generic.defensive_positioning import DefensivePositioning
 from src.namespaces.cards import Cards
 
 
-class MusketeerAction(Action):
+class MusketeerAction(DefensivePositioning):
     CARD = Cards.MUSKETEER
 
     def calculate_score(self, state):

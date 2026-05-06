@@ -8,6 +8,7 @@ If the file is absent it raises FileNotFoundError rather than re-running analysi
 Public API:
   InferenceRunner -- construct with paths, call run() to produce the JSONL file
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import List
 
 from src.constants.cards import elixir_cost
-from src.recommendation.strategy import DTStrategy
+from src.recommendation.heuristic_strategy import HeuristicStrategy
 from src.types import FrameDict, RecommendationDict
 
 
@@ -73,7 +74,7 @@ class InferenceRunner:
         frames: List[FrameDict] = result["frames"]
         print(f"Loaded {len(frames)} frames. Running inference ...")
 
-        strategy = DTStrategy(self._checkpoint, device=self._device)
+        strategy = HeuristicStrategy(self._checkpoint, device=self._device)
         strategy.reset_game()
 
         self._output.parent.mkdir(parents=True, exist_ok=True)
@@ -81,7 +82,7 @@ class InferenceRunner:
 
         with open(self._output, "w", encoding="utf-8") as out_file:
             for frame in frames:
-                ts: int = frame["timestamp_ms"]
+                ts: int = frame.get("timestamp_ms", 0)  # Use .get() for safety
                 elx = frame.get("player_elixir", 0)
                 rec = strategy.recommend(frame)
 
@@ -109,5 +110,7 @@ class InferenceRunner:
                     )
                 out_file.write(json.dumps(dict(entry)) + "\n")
 
-        print(f"Wrote {len(frames)} frames ({n_recs} recommendations) -> {self._output}")
+        print(
+            f"Wrote {len(frames)} frames ({n_recs} recommendations) -> {self._output}"
+        )
         return self._output

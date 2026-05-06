@@ -1,9 +1,9 @@
-"""Fireball play heuristics."""
+"""Fireball strategic coordination module."""
 
-from src.actions.generic.spell_action import SpellAction
+from src.actions.generic.targeted_ability import TargetedAbility
 from src.namespaces.cards import Cards
 
 
-class FireballAction(SpellAction):
+class FireballAction(TargetedAbility):
     CARD = Cards.FIREBALL
     RADIUS = 2.5
