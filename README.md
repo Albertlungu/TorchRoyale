@@ -27,7 +27,8 @@ No external installations required! You just need:
 
 ## Support
 
-For help, please contact 
+For help, please contact [@kashsuks](https://github.com/kashsuks) through [their email](mailto:kashyap@hackclub.help?subject=Issue%20regarding%20TorchRoyale%20on%20GitHub).
+
 To report issues, visit [GitHub Issues page](https://github.com/Albertlungu/TorchRoyale/issues).
 
 ## Sources
