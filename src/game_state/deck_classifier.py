@@ -7,8 +7,35 @@ based on card composition and provides matchup-specific strategies.
 
 from __future__ import annotations
 
+import json
 from enum import Enum
-from typing import Dict, List, Set
+from pathlib import Path
+from typing import Dict, List, Optional, Set
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_COSTS_PATH = _REPO_ROOT / "data" / "card_costs.json"
+
+
+def _load_card_costs() -> Dict[str, int]:
+    """Load card elixir costs from card_costs.json.
+
+    Args:
+        None
+    Returns:
+        (Dict[str, int]): Map of normalized card names to elixir costs
+    """
+    cost_map: Dict[str, int] = {}
+    if not _COSTS_PATH.exists():
+        return cost_map
+    with open(_COSTS_PATH, "r", encoding="utf-8") as handle:
+        entries = json.load(handle)
+    for entry in entries:
+        name = entry["card_name"].lower().replace(" ", "-")
+        cost_map[name] = entry["elixir_cost"]
+    return cost_map
+
+
+_COST_MAP = _load_card_costs()
 
 
 class DeckArchetype(Enum):
@@ -160,39 +187,10 @@ class DeckClassifier:
     @classmethod
     def _calculate_avg_elixir(cls, card_names: List[str]) -> float:
         """Calculate average elixir cost of deck."""
-        # This would use the card_costs.json data
-        # For now, use rough estimates
-        cost_map = {
-            "skeletons": 1,
-            "ice-spirit": 1,
-            "fire-spirit": 1,
-            "electro-spirit": 1,
-            "the-log": 2,
-            "zap": 2,
-            "giant-snowball": 2,
-            "barbarian-barrel": 2,
-            "cannon": 3,
-            "knight": 3,
-            "archers": 3,
-            "minions": 3,
-            "fireball": 4,
-            "musketeer": 4,
-            "hog-rider": 4,
-            "mini-pekka": 4,
-            "giant": 5,
-            "balloon": 5,
-            "wizard": 5,
-            "rocket": 6,
-            "lightning": 6,
-            "golem": 8,
-            "lava-hound": 7,
-            "pekka": 7,
-        }
-
         total_cost = 0
         for card in card_names:
             card_norm = card.lower().replace(" ", "-")
-            total_cost += cost_map.get(card_norm, 3)  # Default to 3
+            total_cost += _COST_MAP.get(card_norm, 3)  # Default to 3
 
         return total_cost / len(card_names) if card_names else 3.0
 
@@ -212,19 +210,19 @@ class DeckClassifier:
             "defensive_weight": 0.5,
             "spell_conservatism": 0.5,
             "bridge_pressure": 0.5,
-            "cycle_speed": 1.0,  # Multiplier for how fast to cycle
+            "cycle_speed": 1.0,  
         }
 
-        # Matchup-specific adjustments
+        # Matchup-specific adjustments (More can be added in the future)
 
-        # Beatdown vs Control: Control should be defensive early, punish overcommits
+        # Beatdown vs Control: Control should be defensive early
         if (
             our_archetype == DeckArchetype.CONTROL
             and opponent_archetype == DeckArchetype.BEATDOWN
         ):
             strategy["defensive_weight"] = 0.7
             strategy["aggression_factor"] = 0.3
-            strategy["spell_conservatism"] = 0.8  # Save spells for big pushes
+            strategy["spell_conservatism"] = 0.8  
 
         # Cycle vs Beatdown: Cycle should pressure opposite lane
         elif (
@@ -232,9 +230,9 @@ class DeckClassifier:
             and opponent_archetype == DeckArchetype.BEATDOWN
         ):
             strategy["aggression_factor"] = 0.6
-            strategy["cycle_speed"] = 1.2  # Cycle faster to outpace their defense
+            strategy["cycle_speed"] = 1.2  
 
-        # Beatdown vs Cycle: Beatdown should be patient, build big pushes
+        # Beatdown vs Cycle: Beatdown should be patient
         elif (
             our_archetype == DeckArchetype.BEATDOWN
             and opponent_archetype == DeckArchetype.CYCLE
@@ -246,9 +244,9 @@ class DeckClassifier:
         # Siege vs Anything: Siege should protect their building
         elif our_archetype == DeckArchetype.SIEGE:
             strategy["defensive_weight"] = 0.7
-            strategy["spell_conservatism"] = 0.8  # Save spells for defense
+            strategy["spell_conservatism"] = 0.8  
 
-        # Bridge Spam vs Control: Spam should be aggressive, force reactions
+        # Bridge Spam vs Control: Spam should be aggressive
         elif (
             our_archetype == DeckArchetype.BRIDGE_SPAM
             and opponent_archetype == DeckArchetype.CONTROL
@@ -256,10 +254,10 @@ class DeckClassifier:
             strategy["aggression_factor"] = 0.7
             strategy["bridge_pressure"] = 0.8
 
-        # Spell Bait vs Anything: Bait should be patient, wait for spell commitment
+        # Spell Bait vs Anything: Bait should be patient
         elif our_archetype == DeckArchetype.SPELL_BAIT:
-            strategy["aggression_factor"] = 0.4  # Wait for spell bait
-            strategy["spell_conservatism"] = 0.3  # Use spells freely to bait
+            strategy["aggression_factor"] = 0.4  
+            strategy["spell_conservatism"] = 0.3  
 
         return strategy
 
@@ -272,7 +270,6 @@ class DeckClassifier:
         for archetype, win_cons in cls.WIN_CONDITIONS.items():
             possible_wins = cards_set & win_cons
             if possible_wins:
-                # Return the first win condition found
                 return next(iter(possible_wins))
 
         return None

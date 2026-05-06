@@ -325,7 +325,7 @@ def _display_deck_result(
     lines.append("Deck Analysis")
     lines.append("")
     lines.append(f"  Archetype:     {archetype.value.title()}")
-    lines.append(f"  Avg elixir:    {avg_elixir:.2f}")
+    lines.append(f"  Avg elixir:    {avg_elixir:.1f}")
     if win_condition:
         lines.append(f"  Win condition: {_card_display_name(win_condition)}")
 
