@@ -26,6 +26,13 @@ class InferenceRunner:
 
     For each frame in the analysis, the Decision Transformer predicts a card
     placement. Results are written one-per-line as JSON (JSONL format).
+
+    Attributes:
+        _video_path (str): Path to the source replay video.
+        _checkpoint (str): Path to the DT model checkpoint.
+        _output (Path): Destination path for the JSONL output file.
+        _analysis_dir (Path): Directory containing pre-computed analysis JSON files.
+        _device (str): PyTorch device string used for model inference.
     """
 
     def __init__(
@@ -37,12 +44,16 @@ class InferenceRunner:
         device: str = "cpu",
     ) -> None:
         """
+        Initialise the runner with source and destination paths.
+
         Args:
-            video_path:      path to the source replay video (used to locate the analysis JSON).
-            checkpoint_path: path to the DT model checkpoint.
-            output_jsonl:    path where the JSONL output will be written.
-            analysis_dir:    directory containing <stem>_analysis.json files.
-            device:          PyTorch device for the model.
+            video_path (str): Path to the source replay video (used to locate
+                the analysis JSON).
+            checkpoint_path (str): Path to the DT model checkpoint.
+            output_jsonl (str): Path where the JSONL output will be written.
+            analysis_dir (str): Directory containing ``<stem>_analysis.json``
+                files.
+            device (str): PyTorch device for the model.
         """
         self._video_path = video_path
         self._checkpoint = checkpoint_path
@@ -55,10 +66,10 @@ class InferenceRunner:
         Run inference over all frames and write the JSONL output file.
 
         Returns:
-            Path to the written JSONL file.
+            Path: Path to the written JSONL file.
 
         Raises:
-            FileNotFoundError: if the cached analysis JSON does not exist.
+            FileNotFoundError: If the cached analysis JSON does not exist.
         """
         stem = Path(self._video_path).stem
         cached = self._analysis_dir / f"{stem}_analysis.json"

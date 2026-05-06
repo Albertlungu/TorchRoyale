@@ -4,9 +4,26 @@ from src.actions.generic.action import Action
 
 
 class OffensiveTactics(Action):
-    """Strategic offensive positioning based on game state analysis."""
+    """
+    Strategic offensive positioning based on game state analysis.
 
-    def calculate_score(self, state):
+    Attributes:
+        CARD (Card): The card associated with this action.
+        tile_x (int): Grid column for the placement.
+        tile_y (int): Grid row for the placement.
+    """
+
+    def calculate_score(self, state) -> list:
+        """
+        Score bridge-push placement based on elixir and enemy tower health.
+
+        Args:
+            state: Current game state with elixir count and tower health values.
+
+        Returns:
+            list: Score components favouring the lane with the weaker enemy tower,
+                or ``[0]`` when the placement is invalid or elixir is insufficient.
+        """
         if (self.tile_x, self.tile_y) not in {(3, 15), (14, 15)}:
             return [0]
 
