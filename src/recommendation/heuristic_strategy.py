@@ -70,12 +70,31 @@ _STRATEGIC_CONTEXT_CACHE: Dict[str, Dict[str, float]] = {}
 
 
 def _is_valid_tile(col: int, row: int) -> bool:
-    """Return True if (col, row) is on the player's side and within grid bounds."""
+    """
+    Check whether a grid coordinate is on the player's side and within bounds.
+
+    Args:
+        col (int): Grid column index.
+        row (int): Grid row index.
+
+    Returns:
+        bool: ``True`` if the tile is a legal player placement, ``False``
+            otherwise.
+    """
     return col in _VALID_COLS and row in _VALID_PLAYER_ROWS
 
 
 def _generate_state_signature(state: FrameDict) -> str:
-    """Generate a deterministic signature for state caching."""
+    """
+    Generate a short deterministic signature for a game state for cache keying.
+
+    Args:
+        state (FrameDict): Current game state frame dictionary.
+
+    Returns:
+        str: 16-character hexadecimal SHA-256 prefix uniquely identifying the
+            state snapshot.
+    """
     state_str = f"{state.get('timestamp_ms', 0)}-{state.get('player_elixir', 0)}"
     for det in state.get("detections", [])[:5]:
         state_str += f"-{det.get('class_name', '')}"
@@ -83,7 +102,20 @@ def _generate_state_signature(state: FrameDict) -> str:
 
 
 def _compute_dt_embedding(state: FrameDict, checkpoint_path: str) -> np.ndarray:
-    """Compute DT embedding from game state using checkpoint-specific transformations."""
+    """
+    Compute a 128-dimensional DT embedding from a game state.
+
+    Results are cached by checkpoint path and state signature to avoid
+    redundant computation within the same frame.
+
+    Args:
+        state (FrameDict): Current game state frame dictionary.
+        checkpoint_path (str): Path to the DT model checkpoint used to seed the
+            transformation.
+
+    Returns:
+        np.ndarray: Normalised 128-dimensional float32 embedding vector.
+    """
     sig = _generate_state_signature(state)
     cache_key = f"{checkpoint_path}:{sig}"
 
@@ -107,7 +139,18 @@ def _compute_dt_embedding(state: FrameDict, checkpoint_path: str) -> np.ndarray:
 
 
 def _extract_state_features(state: FrameDict) -> np.ndarray:
-    """Extract numerical features from game state for DT input."""
+    """
+    Extract a 128-dimensional numerical feature vector from a game state.
+
+    Features include normalised elixir, time, unit counts, and hand size,
+    zero-padded to 128 dimensions for DT input.
+
+    Args:
+        state (FrameDict): Current game state frame dictionary.
+
+    Returns:
+        np.ndarray: 128-element float32 feature array.
+    """
     features = []
 
     # Elixir features
@@ -152,7 +195,22 @@ def _extract_state_features(state: FrameDict) -> np.ndarray:
 def _extract_strategic_context(
     embedding: np.ndarray, state: FrameDict
 ) -> Dict[str, float]:
-    """Extract strategic parameters from DT embedding through learned transformation."""
+    """
+    Derive tactical parameters from a DT embedding via an MLP-style transform.
+
+    Results are cached by embedding content to avoid redundant computation.
+
+    Args:
+        embedding (np.ndarray): 128-dimensional DT embedding vector.
+        state (FrameDict): Current game state frame dictionary used for cache
+            keying.
+
+    Returns:
+        Dict[str, float]: Dictionary of strategic parameters including
+            ``aggression_factor``, ``defensive_weight``, ``elixir_conservatism``,
+            ``bridge_pressure``, ``spell_readiness``, ``tank_support_ratio``, and
+            ``stability``.
+    """
     sig = _generate_state_signature(state)
     cache_key = hashlib.sha256(f"{sig}:{embedding.tobytes()}".encode()).hexdigest()
 
@@ -180,7 +238,19 @@ def _extract_strategic_context(
 def _compute_ensemble_weight(
     dt_confidence: float, heuristic_score: float, context: Dict[str, float]
 ) -> float:
-    """Compute dynamic weighting between DT and heuristic recommendations based on context."""
+    """
+    Compute the dynamic ensemble weight that blends DT and heuristic outputs.
+
+    Args:
+        dt_confidence (float): Confidence score of the DT prediction (0–1).
+        heuristic_score (float): Primary score of the best heuristic action (0–1).
+        context (Dict[str, float]): Strategic context extracted from the DT
+            embedding.
+
+    Returns:
+        float: Ensemble weight in the range [0.1, 0.9] giving the DT's share of
+            the final decision.
+    """
     # Confidence-weighted ensemble with context-aware bias
     base_weight = dt_confidence * 0.7  # Favor DT when confident
 
@@ -196,7 +266,20 @@ def _compute_ensemble_weight(
 def _validate_dt_prediction(
     dt_card: str, dt_tile_x: int, dt_tile_y: int, state: FrameDict
 ) -> Tuple[bool, str]:
-    """Validate DT prediction against game constraints and heuristics."""
+    """
+    Validate a DT prediction against game constraints and heuristic rules.
+
+    Args:
+        dt_card (str): Card name predicted by the DT.
+        dt_tile_x (int): Predicted grid column.
+        dt_tile_y (int): Predicted grid row.
+        state (FrameDict): Current game state used to check hand and elixir.
+
+    Returns:
+        Tuple[bool, str]: A ``(is_valid, reason)`` pair where ``is_valid`` is
+            ``True`` when the prediction passes all checks, and ``reason`` is
+            ``"valid"`` or a short failure code string.
+    """
     hand: List[str] = state.get("hand_cards", [])
     elixir: int = int(state.get("player_elixir") or 0)
 
@@ -229,13 +312,32 @@ class HybridStrategy:
     The DT model provides strategic embeddings that inform heuristic scoring functions.
     In production, the heuristic layer provides necessary tactical validation due to
     on-field detection quality variations, ensuring robust decision-making.
+
+    Attributes:
+        _checkpoint_path (Path): Path to the loaded DT model checkpoint.
+        _device (str): PyTorch device string used for inference.
+        _ready (bool): ``True`` once all components have been initialised.
+        _model_loaded (bool): ``True`` once the DT model state has been loaded.
+        _dt_inference_count (int): Running count of DT inference calls this game.
+        _heuristic_count (int): Running count of heuristic evaluation calls this game.
+        _dt_config (Dict[str, Any]): DT model configuration loaded from checkpoint.
+        _model_state (Dict[str, Any]): Runtime state of the DT model.
+        _action_cache (Dict[str, Any]): Cache of evaluated heuristic actions.
+        _strategic_memory (List[Dict[str, float]]): History of strategic contexts
+            from recent frames.
     """
 
     def __init__(self, checkpoint_path: str, device: str = "cpu") -> None:
         """
+        Load the DT checkpoint and initialise all strategy components.
+
         Args:
-            checkpoint_path: Path to trained DT model checkpoint
-            device: Device for model inference ("cpu", "cuda", "mps")
+            checkpoint_path (str): Path to the trained DT model checkpoint.
+            device (str): Device for model inference (``"cpu"``, ``"cuda"``,
+                or ``"mps"``).
+
+        Raises:
+            FileNotFoundError: If the checkpoint file does not exist.
         """
         self._checkpoint_path = Path(checkpoint_path)
         self._device = device
@@ -255,7 +357,20 @@ class HybridStrategy:
         self._ready = True
 
     def _load_dt_config(self) -> Dict[str, Any]:
-        """Load DT model configuration from checkpoint metadata."""
+        """
+        Load the DT model configuration from checkpoint metadata.
+
+        Attempts to read a ``config.json`` file alongside the checkpoint, then
+        falls back to a hardcoded default configuration.
+
+        Returns:
+            Dict[str, Any]: Model configuration dictionary with keys such as
+                ``embedding_dim``, ``context_length``, ``num_layers``,
+                ``num_heads``, and ``dropout``.
+
+        Raises:
+            FileNotFoundError: If the checkpoint path does not exist.
+        """
         if not self._checkpoint_path.exists():
             raise FileNotFoundError(f"DT checkpoint not found: {self._checkpoint_path}")
 
@@ -279,7 +394,14 @@ class HybridStrategy:
         }
 
     def _initialize_model_state(self) -> Dict[str, Any]:
-        """Initialize DT model state from checkpoint."""
+        """
+        Initialise the DT model runtime state from the loaded checkpoint.
+
+        Returns:
+            Dict[str, Any]: Initial model state dictionary containing the
+                context buffer, embedding dimension, confidence threshold,
+                last embedding, and inference timing.
+        """
         self._model_loaded = True
 
         return {
@@ -292,11 +414,22 @@ class HybridStrategy:
 
     @property
     def is_ready(self) -> bool:
-        """True once DT model and heuristics are initialized."""
+        """
+        Return whether the DT model and heuristics are fully initialised.
+
+        Returns:
+            bool: ``True`` once both the model and the strategy are ready.
+        """
         return self._ready and self._model_loaded
 
     def reset_game(self) -> None:
-        """Reset DT context buffer and heuristic state between games."""
+        """
+        Reset the DT context buffer and heuristic state between games.
+
+        Clears the rolling context window, action cache, strategic memory,
+        inference counters, and module-level embedding caches so that the
+        next game starts from a clean state.
+        """
         # Reset DT state
         if hasattr(self, "_model_state"):
             self._model_state["context_buffer"].clear()
@@ -313,7 +446,20 @@ class HybridStrategy:
         _STRATEGIC_CONTEXT_CACHE.clear()
 
     def _run_dt_inference(self, state: FrameDict) -> Tuple[str, int, int, float]:
-        """Run DT model inference to generate strategic prediction."""
+        """
+        Run one DT inference step to produce a strategic card placement prediction.
+
+        Updates the rolling context buffer with the new embedding and strategic
+        context derived from the current game state.
+
+        Args:
+            state (FrameDict): Current game state frame dictionary.
+
+        Returns:
+            Tuple[str, int, int, float]: A four-tuple of
+                ``(card_name, tile_x, tile_y, confidence)`` representing the
+                DT's recommended placement and its confidence score.
+        """
         self._dt_inference_count += 1
 
         start_time = time.time()
@@ -391,7 +537,22 @@ class HybridStrategy:
     def _evaluate_heuristic_actions(
         self, state: FrameDict, context: Dict[str, float]
     ) -> List[Tuple[str, int, int, List[float]]]:
-        """Evaluate all heuristic actions with DT-provided context."""
+        """
+        Evaluate all heuristic actions for cards currently in the player's hand.
+
+        Each card in the hand is scored at every valid player-side tile, with
+        scores boosted by the DT strategic context.
+
+        Args:
+            state (FrameDict): Current game state frame dictionary.
+            context (Dict[str, float]): Strategic context extracted from the DT
+                embedding.
+
+        Returns:
+            List[Tuple[str, int, int, List[float]]]: List of
+                ``(card_name, tile_x, tile_y, weighted_score)`` tuples for all
+                evaluated placement candidates.
+        """
         self._heuristic_count += 1
 
         hand: List[str] = state.get("hand_cards", [])
@@ -436,10 +597,19 @@ class HybridStrategy:
 
     def recommend(self, state: FrameDict) -> Optional[Tuple[str, int, int]]:
         """
-        Generate recommendation using hybrid DT + heuristic approach.
+        Generate a card placement recommendation using the hybrid DT + heuristic approach.
 
-        The DT model provides strategic embeddings that inform heuristic scoring.
-        The heuristic layer provides tactical validation and refinement.
+        Runs four phases: DT inference for strategic context, heuristic evaluation
+        with that context, ensemble fusion of DT and heuristic signals, and a
+        safety validation fallback.
+
+        Args:
+            state (FrameDict): Current game state frame dictionary.
+
+        Returns:
+            Optional[Tuple[str, int, int]]: A ``(card_name, tile_x, tile_y)``
+                triple representing the recommended placement, or ``None`` if no
+                valid action is available.
         """
         if not self.is_ready:
             return None
@@ -540,10 +710,43 @@ class HybridStrategy:
     def _score_action(
         self, action, state: FrameDict, detections: List[dict]
     ) -> List[float]:
-        """Score an action against current state with strategic augmentation."""
+        """
+        Score a heuristic action against the current game state.
+
+        Constructs lightweight mock objects from the raw frame data so that
+        action classes can call ``calculate_score`` without needing the full
+        live detector state.
+
+        Args:
+            action: Heuristic action instance to evaluate.
+            state (FrameDict): Current game state frame dictionary.
+            detections (List[dict]): List of raw detection dicts from the frame.
+
+        Returns:
+            List[float]: Score components returned by the action's
+                ``calculate_score`` method.
+        """
 
         class MockState:
+            """
+            Lightweight stand-in for the live detector State object.
+
+            Attributes:
+                numbers (MockNumbers): Mock numeric game values.
+                enemies (list): List of MockDetection objects for enemy units.
+                allies (list): List of MockDetection objects for allied units.
+                strategic_context (Dict[str, float]): DT strategic context.
+            """
+
             def __init__(self, frame_data, detections_list, strategic_context):
+                """
+                Initialise the mock state from raw frame data.
+
+                Args:
+                    frame_data (FrameDict): Raw game state frame dictionary.
+                    detections_list (List[dict]): Raw detection dicts.
+                    strategic_context (Dict[str, float]): DT strategic context.
+                """
                 self.numbers = MockNumbers(frame_data, strategic_context)
                 self.enemies = []
                 self.allies = []
@@ -558,23 +761,83 @@ class HybridStrategy:
                             self.allies.append(mock_det)
 
         class MockNumbers:
+            """
+            Mock container for numeric game values used by action scorers.
+
+            Attributes:
+                elixir (MockValue): Current player elixir.
+                left_enemy_princess_hp (MockValue): Left enemy princess health.
+                right_enemy_princess_hp (MockValue): Right enemy princess health.
+                strategic_context (Dict[str, float]): DT strategic context.
+            """
+
             def __init__(self, frame_data, context):
+                """
+                Initialise mock numeric values from frame data.
+
+                Args:
+                    frame_data (FrameDict): Raw game state frame dictionary.
+                    context (Dict[str, float]): DT strategic context.
+                """
                 self.elixir = MockValue(frame_data.get("player_elixir", 0))
                 self.left_enemy_princess_hp = MockValue(100)
                 self.right_enemy_princess_hp = MockValue(100)
                 self.strategic_context = context
 
         class MockValue:
+            """
+            Wrap a single numeric game value for use in action scorers.
+
+            Attributes:
+                number (float): The wrapped numeric value.
+            """
+
             def __init__(self, value):
+                """
+                Initialise the mock value.
+
+                Args:
+                    value: Raw numeric value to wrap.
+                """
                 self.number = float(value)
 
         class MockDetection:
+            """
+            Mock unit detection carrying position and class name.
+
+            Attributes:
+                position (MockPosition): Tile position of the detected unit.
+                unit (str): Class name of the detected unit.
+            """
+
             def __init__(self, detection):
+                """
+                Initialise from a raw detection dict.
+
+                Args:
+                    detection (dict): Raw detection dictionary with ``tile_x``,
+                        ``tile_y``, and ``class_name`` keys.
+                """
                 self.position = MockPosition(detection)
                 self.unit = detection.get("class_name", "")
 
         class MockPosition:
+            """
+            Mock tile position used by action scorers.
+
+            Attributes:
+                tile_x (int): Grid column of the detected unit.
+                tile_y (int): Grid row of the detected unit.
+            """
+
             def __init__(self, detection):
+                """
+                Initialise tile coordinates from a raw detection dict.
+
+                Args:
+                    detection (dict): Raw detection dictionary with ``tile_x``
+                        and ``tile_y`` keys.
+                """
                 self.tile_x = detection.get("tile_x", 0)
                 self.tile_y = detection.get("tile_y", 0)
 
