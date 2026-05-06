@@ -17,12 +17,14 @@ _COSTS_PATH = _REPO_ROOT / "data" / "card_costs.json"
 
 
 def _load_card_costs() -> Dict[str, int]:
-    """Load card elixir costs from card_costs.json.
+    """
+    Load card elixir costs from the card_costs.json data file.
 
     Args:
         None
+
     Returns:
-        (Dict[str, int]): Map of normalized card names to elixir costs
+        (Dict[str, int]): Map of normalized card names (lowercase, hyphens) to their elixir costs
     """
     cost_map: Dict[str, int] = {}
     if not _COSTS_PATH.exists():
@@ -39,7 +41,17 @@ _COST_MAP = _load_card_costs()
 
 
 class DeckArchetype(Enum):
-    """Six major Clash Royale deck archetypes."""
+    """Enum representing the six major Clash Royale deck archetypes plus an unclassified fallback.
+
+    Attributes:
+        BEATDOWN (DeckArchetype): Heavy tank-based decks 
+        CONTROL (DeckArchetype): Defensive decks with chipping
+        CYCLE (DeckArchetype): Low-cost decks to cycle to one win condition
+        SIEGE (DeckArchetype): Building-focused decks 
+        BRIDGE_SPAM (DeckArchetype): Aggressive decks 
+        SPELL_BAIT (DeckArchetype): Swarm-heavy decks 
+        UNKNOWN (DeckArchetype): Fallback 
+    """
 
     BEATDOWN = "beatdown"
     CONTROL = "control"
@@ -51,7 +63,18 @@ class DeckArchetype(Enum):
 
 
 class DeckClassifier:
-    """Classifies decks into archetypes based on card composition."""
+    """Classifies Clash Royale decks into archetypes and provides matchup-specific strategies
+
+    Attributes:
+        WIN_CONDITIONS (Dict[DeckArchetype, Set[str]]): Mapping of archetypes 
+        TANKS (Set[str]): High-HP, tower-targeting 
+        MINI_TANKS (Set[str]): Moderate-HP 
+        CONTROL_DEFENSE (Set[str]): Defensive cards 
+        CYCLE_CARDS (Set[str]): Very low elixir cost cards 
+        SIEGE_BUILDINGS (Set[str]): Siege buildings 
+        BRIDGE_SPAM_CARDS (Set[str]): bridge spam card
+        BAIT_CARDS (Set[str]): Swarm and bait cards 
+    """
 
     # Win condition cards for each archetype
     WIN_CONDITIONS = {
@@ -135,13 +158,13 @@ class DeckClassifier:
     @classmethod
     def classify_deck(cls, card_names: List[str]) -> DeckArchetype:
         """
-        Classify a deck based on its card composition.
+        Classify a deck into an archetype based on its card composition.
 
         Args:
-            card_names: List of normalized card names in the deck
+            card_names (List[str]): List of card names in the deck (case-insensitive, spaces allowed)
 
         Returns:
-            DeckArchetype classification
+            (DeckArchetype): Classified deck archetype determined by card composition rules
         """
         cards_set = {card.lower().replace(" ", "-") for card in card_names}
 
@@ -186,7 +209,15 @@ class DeckClassifier:
 
     @classmethod
     def _calculate_avg_elixir(cls, card_names: List[str]) -> float:
-        """Calculate average elixir cost of deck."""
+        """
+        Calculate the average elixir cost of a deck
+
+        Args:
+            card_names (List[str]): List of card names in the deck
+
+        Returns:
+            (float): Average elixir cost of the deck
+        """
         total_cost = 0
         for card in card_names:
             card_norm = card.lower().replace(" ", "-")
@@ -199,10 +230,14 @@ class DeckClassifier:
         cls, our_archetype: DeckArchetype, opponent_archetype: DeckArchetype
     ) -> Dict[str, float]:
         """
-        Get strategic parameters for a specific matchup.
+        Get strategic parameters for a matchup between two deck archetypes.
+
+        Args:
+            our_archetype (DeckArchetype): Our deck's classified archetype
+            opponent_archetype (DeckArchetype): Opponent's deck classified archetype
 
         Returns:
-            Dict with: aggression_factor, defensive_weight, spell_conservatism, etc.
+            (Dict[str, float]): Dictionary of strategic parameters including aggression_factor, defensive_weight, spell_conservatism, bridge_pressure, and cycle_speed
         """
         # Default neutral strategy
         strategy = {
@@ -263,7 +298,15 @@ class DeckClassifier:
 
     @classmethod
     def get_win_condition(cls, card_names: List[str]) -> Optional[str]:
-        """Extract the primary win condition from a deck."""
+        """
+        Extract the primary win condition card from a deck.
+
+        Args:
+            card_names (List[str]): List of card names in the deck
+
+        Returns:
+            (Optional[str]): Normalized name of the primary win condition card if found, else None
+        """
         cards_set = {card.lower().replace(" ", "-") for card in card_names}
 
         # Check each archetype's win conditions
