@@ -3,16 +3,13 @@
 import time
 from typing import Dict, List, Optional
 
-import numpy as np
 from PIL import Image
 
-from src.detection.hand_classifier import HandClassifier
+from src.detection.card_detector import CardDetector
 from src.detection.number_detector import NumberDetector
 from src.detection.screen_detector import ScreenDetector
 from src.detection.unit_detector import UnitDetector
 from src.namespaces.cards import Card
-from src.namespaces.cards import CARD_OBJECTS
-from src.namespaces.cards import Cards
 from src.namespaces.screens import Screens
 from src.namespaces.state import State
 
@@ -24,7 +21,8 @@ class LiveDetector:
     Attributes:
         DECK_SIZE (int): Expected number of cards in a player's deck (8).
         cards (list): List of Card objects representing the player's deck.
-        card_detector (HandClassifier): Classifier for cards visible in the hand.
+        card_detector (CardDetector): Slot-aware detector for the next card and
+            the four visible hand cards.
         number_detector (NumberDetector): Detector for on-screen numeric values.
         unit_detector (UnitDetector): Detector for units on the battlefield.
         screen_detector (ScreenDetector): Detector for the current game screen state.
@@ -46,27 +44,10 @@ class LiveDetector:
             raise ValueError(f"You must specify all {self.DECK_SIZE} deck cards.")
 
         self.cards = list(cards)
-        self.card_detector = HandClassifier()
+        self.card_detector = CardDetector(self.cards)
         self.number_detector = NumberDetector()
         self.unit_detector = UnitDetector(self.cards)
         self.screen_detector = ScreenDetector()
-
-    @staticmethod
-    def _card_from_label(label: Optional[str]) -> Card:
-        """
-        Convert a classifier label string to the corresponding Card object.
-
-        Args:
-            label (Optional[str]): Raw label returned by the hand classifier,
-                or ``None`` if no card was detected.
-
-        Returns:
-            Card: Matched Card object, or ``Cards.BLANK`` when unrecognised.
-        """
-        if not label:
-            return Cards.BLANK
-        normalized = label.lower().replace("-", "_")
-        return CARD_OBJECTS.get(normalized, Cards.BLANK)
 
     def run(self, image: Image.Image) -> State:
         """
@@ -79,20 +60,11 @@ class LiveDetector:
             State: Detected game state including hand cards, units, numbers,
                 and current screen.
         """
-        # HandClassifier expects an OpenCV-style ndarray rather than a PIL image.
-        bgr_frame = np.asarray(image.convert("RGB"))[:, :, ::-1]
-        hand_labels = self.card_detector.classify(bgr_frame)
-        cards = tuple(
-            [Cards.BLANK]
-            + [self._card_from_label(label) for label in hand_labels]
-        )
-        ready = [
-            index for index, card in enumerate(cards[1:5]) if card != Cards.BLANK
-        ]
+        cards, ready = self.card_detector.run(image)
         allies, enemies = self.unit_detector.run(image)
         numbers = self.number_detector.run(image)
         screen = self.screen_detector.run(image)
-        return State(allies, enemies, numbers, cards, ready, screen)
+        return State(allies, enemies, numbers, tuple(cards), ready, screen)
 
 
 class StateAdapter:

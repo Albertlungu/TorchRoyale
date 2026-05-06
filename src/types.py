@@ -29,6 +29,14 @@ class DetectionDict(TypedDict, total=False):
     confidence: float
 
 
+class HandSlotDict(TypedDict, total=False):
+    """A single hand-card classification with an explicit 1-based slot."""
+
+    slot: int
+    class_name: str
+    confidence: float
+
+
 class TowerDict(TypedDict, total=False):
     """Health state for one tower (king or arena towers)."""
 
@@ -60,6 +68,7 @@ class FrameDict(TypedDict, total=False):
     opponent_elixir_estimated: Optional[int]
     detections: List[DetectionDict]
     hand_cards: List[str]
+    hand_slots: List[HandSlotDict]
     player_towers: _PlayerTowers
     opponent_towers: _OpponentTowers
 

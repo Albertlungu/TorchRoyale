@@ -26,14 +26,17 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional
 
 import cv2
+from PIL import Image
 
+from src.detection.card_detector import ClassifierCardDetector
 from src.detection.hand_classifier import HandClassifier
 from src.detection.hand_tracker import HandTracker
 from src.detection.on_field_tracker import OnFieldTracker
 from src.detection.dual_model_detector import DualModelDetector
+from src.namespaces.cards import CARD_OBJECTS
 from src.ocr.detector import DigitDetector
 from src.ocr.regions import UIRegions
-from src.types import DetectionDict, FrameDict, VideoInfoDict
+from src.types import DetectionDict, FrameDict, HandSlotDict, VideoInfoDict
 
 
 class VideoAnalyzer:
@@ -75,7 +78,11 @@ class VideoAnalyzer:
         )
         self._ocr = DigitDetector(preload=preload_ocr)
         self._hand_tracker = HandTracker()
-        self._hand_clf = HandClassifier()
+        self._hand_clf = (
+            ClassifierCardDetector(tuple(CARD_OBJECTS.values()))
+            if ClassifierCardDetector.assets_available()
+            else HandClassifier()
+        )
         self._field_tracker = OnFieldTracker(window=4)
 
     def analyze_video(self, video_path: str) -> Dict[str, Any]:
@@ -172,7 +179,7 @@ class VideoAnalyzer:
             # alive at their last known position to suppress detection flicker.
             on_field_dets: List[DetectionDict] = self._field_tracker.update(raw_field_dets)
 
-            # Local hand classifier — identify the 4 hand slots
+            # Local hand classifier — identify the four visible hand slots.
             x_left, x_right = (
                 self._dual_detector._game_strip[:2]
                 if self._dual_detector._game_strip
@@ -180,10 +187,22 @@ class VideoAnalyzer:
             )
             game_strip = (x_left, x_right) if x_left is not None else None
             hand_dets: List[DetectionDict] = []
+            hand_slots: List[HandSlotDict] = []
             try:
-                classified = self._hand_clf.classify(frame, game_strip=game_strip)
-                for card_name in classified:
-                    if card_name:
+                if isinstance(self._hand_clf, ClassifierCardDetector):
+                    pil_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                    classified_cards, _ready = self._hand_clf.run(pil_frame)
+                    classified = [card.name for card in classified_cards[1:5]]
+                else:
+                    classified = self._hand_clf.classify(frame, game_strip=game_strip)
+
+                for slot_index, card_name in enumerate(classified, start=1):
+                    if card_name and card_name != "blank":
+                        hand_slots.append(HandSlotDict(
+                            slot=slot_index,
+                            class_name=card_name,
+                            confidence=1.0,
+                        ))
                         hand_dets.append(DetectionDict(
                             class_name=f"{card_name}-in-hand",
                             tile_x=0,
@@ -248,6 +267,7 @@ class VideoAnalyzer:
                 opponent_elixir_estimated=None,
                 detections=all_dets,
                 hand_cards=tracked_hand,
+                hand_slots=hand_slots,
                 player_towers={},
                 opponent_towers={},
             ))
