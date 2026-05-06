@@ -94,13 +94,11 @@ def setup_top_bar(main_window: MainWindow) -> tuple[QFrame, QPushButton, QPushBu
     Create the top bar with title, status, and transport controls.
 
     Args:
-        main_window (MainWindow): The main window instance whose toggle methods
-            are connected to button signals.
+        main_window (MainWindow): The main window instance whose toggle methods are connected to button signals.
 
     Returns:
         tuple[QFrame, QPushButton, QPushButton, QLabel]:
-            The configured top bar widget, start/stop button, play/pause button,
-            and status label.
+            The configured top bar widget, start/stop button, play/pause button, and status label
     """
     top_bar = QFrame()
     top_bar.setObjectName("topBar")

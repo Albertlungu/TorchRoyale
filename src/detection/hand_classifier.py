@@ -72,11 +72,16 @@ _MIN_CONF: float = 0.40
 
 
 def get_next_bbox(frame_h: int, frame_w: int, x_left: int, x_right: int):
-    """Return pixel bbox (x1, y1, x2, y2) for the Next-card preview area.
+    """
+    Return pixel bbox (x1, y1, x2, y2) for the Next-card preview area.
 
     Args:
-        frame_h, frame_w: frame dimensions
-        x_left, x_right: detected game strip left/right columns
+        frame_h (int): Frame height in pixels
+        frame_w (int): Frame width in pixels
+        x_left (int): Left pixel bound of the game strip
+        x_right (int): Right pixel bound of the game strip
+    Returns:
+        (Tuple[int, int, int, int]): Tuple of (x1, y1, x2, y2) coordinates
     """
     game_w = x_right - x_left
     next_left = x_left + int(game_w * _NEXT_LEFT_FRAC)
@@ -94,19 +99,33 @@ def get_next_bbox(frame_h: int, frame_w: int, x_left: int, x_right: int):
 class HandClassifier:
     """
     Classifies the four hand card slots in a Clash Royale frame.
-
-    Weights are loaded lazily on the first call to classify().
+    
+    Attributes:
+        _weights (Path): File path to the YOLOv8 classification model weights.
+        _model (Optional[YOLO]): Loaded YOLOv8 model instance, loaded lazily.
     """
 
     def __init__(self, weights_path: Optional[str] = None) -> None:
         """
+        Initialize the classifier with optional custom weights path.
+        
         Args:
-            weights_path: path to best.pt; defaults to the trained local weights.
+            weights_path (Optional[str]): Path to the .pt file; defaults to built-in path
+        Returns:
+            None
         """
         self._weights = Path(weights_path) if weights_path else _WEIGHTS_PATH
         self._model = None
 
     def _load(self) -> None:
+        """
+        Load the YOLOv8 model weights into memory if not already loaded.
+        
+        Args:
+            None
+        Returns:
+            None
+        """
         if self._model is not None:
             return
         if not self._weights.exists():
@@ -124,12 +143,10 @@ class HandClassifier:
         Classify all four hand card slots in the frame.
 
         Args:
-            frame:      full BGR frame from OpenCV.
-            game_strip: (x_left, x_right) pixel bounds of the game content strip.
-                        If None, they are auto-detected from column brightness.
-
+            frame (np.ndarray): Full BGR frame from OpenCV
+            game_strip (Optional[Tuple[int, int]]): (x_left, x_right) pixel bounds of the game strip
         Returns:
-            List of four card name strings (or None if confidence is too low).
+            (List[Optional[str]]): List of four normalized card name strings (or None)
         """
         self._load()
         frame_h, frame_w = frame.shape[:2]
