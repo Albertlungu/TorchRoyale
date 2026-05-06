@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import QWidget
 
 from src.ui.gameplay_widget import ImageStreamWindow
 from src.ui.strategy_tab import _build_strategy_tab
+from src.ui.strategy_tab import _build_strategy_tab
 from src.ui.utils import AppConfig
 from src.ui.utils import save_config
 
