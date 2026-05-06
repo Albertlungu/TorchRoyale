@@ -19,13 +19,12 @@ class LiveDetector:
     Run the migrated detector stack over a live screenshot.
 
     Attributes:
-        DECK_SIZE (int): Expected number of cards in a player's deck (8).
-        cards (list): List of Card objects representing the player's deck.
-        card_detector (CardDetector): Slot-aware detector for the next card and
-            the four visible hand cards.
-        number_detector (NumberDetector): Detector for on-screen numeric values.
-        unit_detector (UnitDetector): Detector for units on the battlefield.
-        screen_detector (ScreenDetector): Detector for the current game screen state.
+        DECK_SIZE (int): Expected number of cards in a player's deck (8)
+        cards (list): List of Card objects representing the player's deck
+        card_detector (CardDetector): Slot-aware detector for the next card and the four visible hand cards
+        number_detector (NumberDetector): Detector for on-screen numeric values
+        unit_detector (UnitDetector): Detector for units on the battlefield
+        screen_detector (ScreenDetector): Detector for the current game screen state
     """
 
     DECK_SIZE = 8
@@ -35,10 +34,10 @@ class LiveDetector:
         Initialise detectors for the given deck.
 
         Args:
-            cards (List[Card]): All eight cards in the player's deck.
+            cards (List[Card]): All eight cards in the player's deck
 
         Raises:
-            ValueError: If the number of cards provided is not exactly DECK_SIZE.
+            ValueError: If the number of cards provided is not exactly DECK_SIZE
         """
         if len(cards) != self.DECK_SIZE:
             raise ValueError(f"You must specify all {self.DECK_SIZE} deck cards.")
@@ -54,11 +53,9 @@ class LiveDetector:
         Run all detectors on a single screenshot and return the combined state.
 
         Args:
-            image (Image.Image): PIL screenshot of the current game frame.
-
+            image (Image.Image): PIL screenshot of the current game frame
         Returns:
-            State: Detected game state including hand cards, units, numbers,
-                and current screen.
+            State: Detected game state including hand cards, units, numbers, and current screen
         """
         cards, ready = self.card_detector.run(image)
         allies, enemies = self.unit_detector.run(image)
@@ -72,13 +69,17 @@ class StateAdapter:
     Adapt live detector state into the frame schema used by strategies.
 
     Attributes:
-        _game_started_at (Optional[float]): Unix timestamp of when the current
-            game started, or ``None`` when not in-game.
+        _game_started_at (Optional[float]): Unix timestamp of when the current game started, or None when not in-game
     """
 
     def __init__(self) -> None:
         """
         Initialise the adapter with no active game session.
+
+        Args:
+            None
+        Returns:
+            None
         """
         self._game_started_at: Optional[float] = None
 
@@ -88,10 +89,9 @@ class StateAdapter:
         Convert underscore-separated unit names to hyphen-separated form.
 
         Args:
-            name (str): Raw unit name using underscores.
-
+            name (str): Raw unit name using underscores
         Returns:
-            str: Name with underscores replaced by hyphens.
+            str: Name with underscores replaced by hyphens
         """
         return name.replace("_", "-")
 
@@ -100,11 +100,9 @@ class StateAdapter:
         Calculate the estimated seconds remaining in the current game.
 
         Args:
-            state (State): Current detected game state.
-
+            state (State): Current detected game state
         Returns:
-            Optional[int]: Seconds remaining, clamped to zero, or ``None`` if
-                not currently in-game.
+            Optional[int]: Seconds remaining, clamped to zero, or None if not currently in-game
         """
         if state.screen == Screens.IN_GAME and self._game_started_at is None:
             self._game_started_at = time.time()
@@ -123,10 +121,9 @@ class StateAdapter:
         Determine the current game phase from the time remaining.
 
         Args:
-            time_remaining (Optional[int]): Seconds left in the game, or ``None``.
-
+            time_remaining (Optional[int]): Seconds left in the game, or None
         Returns:
-            str: ``"double"`` during overtime (≤60 s), ``"single"`` otherwise.
+            str: "double" during overtime (≤60 s), "single" otherwise
         """
         if time_remaining is None:
             return "single"
@@ -139,12 +136,9 @@ class StateAdapter:
         Serialise ally and enemy unit detections into strategy-compatible dicts.
 
         Args:
-            state (State): Current detected game state containing unit detections.
-
+            state (State): Current detected game state
         Returns:
-            List[Dict[str, object]]: List of detection payload dicts, each with
-                ``class_name``, ``tile_x``, ``tile_y``, ``is_opponent``, and
-                ``is_on_field`` keys.
+            List[Dict[str, object]]: List of detection payload dicts with class_name, tile_x, tile_y, is_opponent, and is_on_field keys
         """
         payload = []
         for detection in state.allies:
@@ -174,11 +168,9 @@ class StateAdapter:
         Convert a raw detector state into the frame dict expected by strategies.
 
         Args:
-            state (State): Current detected game state.
-
+            state (State): Current detected game state
         Returns:
-            Dict[str, object]: Frame dict with keys for timestamp, elixir,
-                game phase, tower health, unit detections, and hand cards.
+            Dict[str, object]: Frame dict with keys for timestamp, elixir, game phase, tower health, unit detections, and hand cards
         """
         time_remaining = self._time_remaining(state)
         return {

@@ -14,13 +14,20 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-import cv2  # type: ignore[import]
+import cv2  
 import numpy as np
 
 
 @dataclass
 class OCRResult:
-    """Result from a single OCR detection attempt."""
+    """Result from a single OCR detection attempt.
+    
+    Attributes:
+        value (int): Parsed numeric value from the OCR read
+        confidence (float): Confidence score from the OCR engine
+        detected (bool): Whether the value was successfully detected and parsed
+        raw_text (str): Raw text string returned by the OCR engine
+    """
 
     value: int
     confidence: float
@@ -31,22 +38,33 @@ class OCRResult:
 class DigitDetector:
     """
     Reads numeric UI elements from a video frame using EasyOCR.
-
-    The EasyOCR reader is loaded lazily to avoid paying the startup cost
-    unless detection is actually needed.
+    
+    Attributes:
+        _reader (Optional[easyocr.Reader]): Lazy-loaded EasyOCR reader instance
     """
 
     def __init__(self, preload: bool = False) -> None:
         """
+        Initialize the detector with optional preloading of the OCR engine.
+        
         Args:
-            preload: if True, initialise the EasyOCR reader immediately.
+            preload (bool): If True, initialize the EasyOCR reader immediately
+        Returns:
+            None
         """
         self._reader = None
         if preload:
             self._get_reader()
 
     def _get_reader(self):  # type: ignore[return]
-        """Return the shared EasyOCR reader, initialising it on first call."""
+        """
+        Return the shared EasyOCR reader, initialising it on first call.
+        
+        Args:
+            None
+        Returns:
+            (easyocr.Reader): Initialized EasyOCR reader instance
+        """
         if self._reader is None:
             import easyocr  # type: ignore  # pylint: disable=import-outside-toplevel
             self._reader = easyocr.Reader(["en"], gpu=False)
@@ -57,10 +75,9 @@ class DigitDetector:
         Convert an ROI to a high-contrast binary image suitable for digit OCR.
 
         Args:
-            roi: BGR or greyscale image crop.
-
+            roi (np.ndarray): BGR or greyscale image crop
         Returns:
-            Binary (0/255) greyscale image, upscaled to at least 128 px tall.
+            (np.ndarray): Binary (0/255) greyscale image, upscaled to at least 128 px tall
         """
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY) if roi.ndim == 3 else roi
         if gray.shape[0] < 128:
@@ -69,22 +86,21 @@ class DigitDetector:
         _, binary = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
         return binary
 
-    # ------------------------------------------------------------------
     # Timer
-    # ------------------------------------------------------------------
 
     def detect_timer(
         self, frame: np.ndarray, region: Tuple[int, int, int, int]
     ) -> Optional[int]:
         """
-        Read the countdown timer from a frame region.
+        Read all digits visible in a tower bbox as a raw string.
 
         Args:
-            frame:  full BGR frame.
-            region: (x1, y1, x2, y2) crop rectangle.
-
+            frame (np.ndarray): Full BGR frame
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) crop rectangle
+            bottom_fraction (float): Fraction of the crop to read from the bottom
+            invert (bool): Invert the binary before OCR
         Returns:
-            Time remaining in seconds, or None if unreadable.
+            (str): Digit-only string, may be empty if nothing detected
         """
         x1, y1, x2, y2 = region
         roi = frame[y1:y2, x1:x2]
@@ -108,10 +124,9 @@ class DigitDetector:
         Parse a timer string into total seconds.
 
         Args:
-            text: raw OCR text, e.g. "1:23" or "123".
-
+            text (str): Raw OCR text
         Returns:
-            Seconds remaining, or None if unparseable.
+            (Optional[int]): Seconds remaining, or None if unparseable
         """
         match = re.match(r"(\d{1,2}):(\d{2})", text)
         if match:
@@ -126,9 +141,7 @@ class DigitDetector:
             return int(text)
         return None
 
-    # ------------------------------------------------------------------
     # Elixir
-    # ------------------------------------------------------------------
 
     def detect_elixir(
         self, frame: np.ndarray, region: Tuple[int, int, int, int]
@@ -137,11 +150,10 @@ class DigitDetector:
         Read the player's current elixir count from a frame region.
 
         Args:
-            frame:  full BGR frame.
-            region: (x1, y1, x2, y2) crop rectangle.
-
+            frame (np.ndarray): Full BGR frame
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) crop rectangle
         Returns:
-            OCRResult with value in [0, 10]. Falls back to value=5 if undetected.
+            (OCRResult): Parsed elixir value and metadata
         """
         x1, y1, x2, y2 = region
         roi = frame[y1:y2, x1:x2]
@@ -169,10 +181,9 @@ class DigitDetector:
         Parse an elixir string into an integer in [0, 10].
 
         Args:
-            text: raw digit string from OCR.
-
+            text (str): Raw digit string from OCR
         Returns:
-            Elixir count, or None if unparseable.
+            (Optional[int]): Elixir count, or None if unparseable
         """
         if not text:
             return None
@@ -189,10 +200,7 @@ class DigitDetector:
             return min(digit, 10)
         return None
 
-    # ------------------------------------------------------------------
     # Multiplier icon
-    # ------------------------------------------------------------------
-
     def detect_multiplier(
         self, frame: np.ndarray, region: Tuple[int, int, int, int]
     ) -> int:
@@ -202,11 +210,10 @@ class DigitDetector:
         Uses purple hue detection first; if the icon is absent returns 1.
 
         Args:
-            frame:  full BGR frame.
-            region: (x1, y1, x2, y2) crop rectangle.
-
+            frame (np.ndarray): Full BGR frame.
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) crop rectangle.
         Returns:
-            1, 2, or 3.
+            (int): Multiplier value, either 1, 2, or 3.
         """
         x1, y1, x2, y2 = region
         roi = frame[y1:y2, x1:x2]
@@ -231,10 +238,7 @@ class DigitDetector:
                     return int(ch)
         return 2
 
-    # ------------------------------------------------------------------
     # Tower OCR
-    # ------------------------------------------------------------------
-
     def detect_tower_raw(
         self,
         frame: np.ndarray,
@@ -253,15 +257,12 @@ class DigitDetector:
         The caller (TowerTracker) is responsible for interpreting the string.
 
         Args:
-            frame:           full BGR frame.
-            region:          (x1, y1, x2, y2) crop rectangle.
-            bottom_fraction: if < 1.0, only the bottom fraction of the crop is
-                             read. Useful to skip crown prongs on king towers.
-            invert:          invert the binary before OCR. Required for king
-                             tower crown badges where digits are dark on bright.
-
+            frame (np.ndarray): Full BGR frame.
+            region (Tuple[int, int, int, int]): (x1, y1, x2, y2) crop rectangle.
+            bottom_fraction (float): If < 1.0, only the bottom fraction of the crop is read.
+            invert (bool): Invert the binary before OCR.
         Returns:
-            Digit-only string, may be empty if nothing detected.
+            (str): Digit-only string, may be empty if nothing detected.
         """
         x1, y1, x2, y2 = region
         roi = frame[y1:y2, x1:x2]

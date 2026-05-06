@@ -36,13 +36,36 @@ TILE_INIT_Y = 296
 
 
 class TorchRoyaleBot:
-    """Live bot that captures device frames and executes strategy taps."""
+    """Live bot that captures device frames and executes strategy taps.
+    
+    Attributes:
+        config (Dict[str, Any]): Application configuration dictionary
+        log_handler (Optional[Callable[[str], None]]): Callback for logging to the UI
+        pause_event (threading.Event): Threading event for pause/resume control
+        should_run (bool): Flag to terminate the main loop
+        actions (list): List of heuristic Action classes mapped to the deck
+        device (AndroidDevice): Interface for ADB connection to the Android device
+        detector (LiveDetector): Pipeline for unit, hand, and OCR detection
+        visualizer (Visualizer): Draws annotations and emits frame updates to the UI
+        auto_start (bool): automatically start the game
+        load_deck (bool): Whether to load the configured deck on startup
+        loop_delay (float): Seconds to wait after playing a card
+    """
 
     def __init__(
         self,
         config: Dict[str, Any],
         log_handler: Optional[Callable[[str], None]] = None,
     ) -> None:
+        """
+        Initialize the bot with configuration and detection pipelines
+        
+        Args:
+            config (Dict[str, Any]): Configuration for device and gameplay settings
+            log_handler (Optional[Callable[[str], None]]): Callback function for UI logging
+        Returns:
+            None
+        """
         self.config = config
         self.log_handler = log_handler
         self.pause_event = threading.Event()
@@ -72,6 +95,14 @@ class TorchRoyaleBot:
 
     @staticmethod
     def _deck_from_config(config: Dict[str, Any]) -> list:
+        """
+        Extract and validate the deck list from the configuration
+        
+        Args:
+            config (Dict[str, Any]): Application configuration dictionary
+        Returns:
+            (list): List of Card objects representing the deck
+        """
         names = config.get("bot", {}).get("deck")
         if names:
             cards = []
@@ -98,6 +129,14 @@ class TorchRoyaleBot:
 
     @staticmethod
     def _actions_for_deck(deck_cards: list):
+        """
+        Map deck cards to their corresponding heuristic Action classes
+        
+        Args:
+            deck_cards (list): List of Card objects for the player's deck
+        Returns:
+            (list): List of Action classes ready to be instantiated
+        """
         action_by_card_name = {
             Cards.MINIONS.name: MinionsAction,
             Cards.GIANT.name: GiantAction,
@@ -137,6 +176,14 @@ class TorchRoyaleBot:
         return int(x), int(y)
 
     def _get_actions(self, state):
+        """
+        Generate all valid heuristic actions for ready cards and board tiles
+        
+        Args:
+            state (State): Current game state including ready slots and hand cards
+        Returns:
+            (list): List of instantiated Action objects
+        """
         valid_actions = []
         for index in state.ready:
             card = state.cards[index + 1]
@@ -155,6 +202,14 @@ class TorchRoyaleBot:
         return valid_actions
 
     def _play_best_action(self, state) -> None:
+        """
+        Score available actions and execute the highest-scoring tap sequence
+        
+        Args:
+            state (State): Current game state for heuristic evaluation
+        Returns:
+            None
+        """
         actions = self._get_actions(state)
         if not actions:
             self._log("No actions available.")
@@ -186,6 +241,14 @@ class TorchRoyaleBot:
         time.sleep(self.loop_delay)
 
     def pause_or_resume(self) -> None:
+        """
+        Toggle the pause/resume state of the bot.
+        
+        Args:
+            None
+        Returns:
+            None
+        """
         if self.pause_event.is_set():
             self.pause_event.clear()
             self._log("Bot paused.")
@@ -194,6 +257,14 @@ class TorchRoyaleBot:
             self._log("Bot resumed.")
 
     def stop(self) -> None:
+        """
+        Signal the main loop to terminate
+        
+        Args:
+            None
+        Returns:
+            None
+        """
         self.should_run = False
 
     def _handle_screen(self, state) -> bool:
@@ -223,17 +294,19 @@ class TorchRoyaleBot:
             if not self.pause_event.is_set():
                 time.sleep(0.1)
                 continue
-
+            #capture
             screenshot = self.device.take_screenshot()
             if not started:
                 self._log("TorchRoyale live bot started.")
                 started = True
+            #detect + OCR
             state = self.detector.run(screenshot)
+            #Visualizer
             self.visualizer.run(screenshot, state)
 
             if self._handle_screen(state):
                 continue
-
+            #Score + Tap
             self._play_best_action(state)
             time.sleep(0.5)
 
