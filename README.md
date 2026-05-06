@@ -9,7 +9,7 @@ A complete AI Model that analyzes Clash Royale gameplay live videos and plays mo
 - **Hybrid Strategy System**: Combines learned transformer with domain-specific heuristic rules for decision-making
 - **Automatic Card Tracking**: Stateful hand tracker with evolution and hero detection, mainly handling the Hog 2.6 deck (cannon, fireball, hog rider, ice golem, ice spirit, log, musketeer, skeletons)
 - **UI**: An easy-to-use UI with configurable settings, strategy, and live game visualizer tabs
-- **Windows App Build**: Portable executable available for Mac users via PyInstaller
+- **App Build**: Portable executable available for Mac users via PyInstaller
 
 ## Installation
 
