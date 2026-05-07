@@ -1,103 +1,72 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -e
 
-set -euo pipefail
+echo "Building TorchRoyale.app locally..."
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_PATH="${1:-$ROOT_DIR/dist/TorchRoyale.app}"
-BACKGROUND_SOURCE="${2:-/Users/ksukshavasi/Downloads/clash-royale-royal-chef-tower-troop-4273990514.jpg}"
-OUTPUT_DMG="${3:-$ROOT_DIR/dist/TorchRoyale.dmg}"
-VOLUME_NAME="TorchRoyale Installer"
-WINDOW_WIDTH=720
-WINDOW_HEIGHT=405
-ICON_SIZE=128
-APP_ICON_X=180
-APP_ICON_Y=210
-APPS_ICON_X=540
-APPS_ICON_Y=210
+# Clean previous build
+rm -rf python pbs.tar.gz TorchRoyale.app dmg-stage TorchRoyale-macOS.dmg
 
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "Missing app bundle at $APP_PATH" >&2
-  exit 1
-fi
+# Fetch self-contained Python (no external framework dependencies)
+curl -L "https://github.com/indygreg/python-build-standalone/releases/download/20250127/cpython-3.12.9+20250127-aarch64-apple-darwin-install_only.tar.gz" -o pbs.tar.gz
+tar -xf pbs.tar.gz
+rm pbs.tar.gz
 
-if [[ ! -f "$BACKGROUND_SOURCE" ]]; then
-  echo "Missing background image at $BACKGROUND_SOURCE" >&2
-  exit 1
-fi
+python/bin/pip3 install --upgrade pip -q
+python/bin/pip3 install -r requirements.txt -q
 
-mkdir -p "$(dirname "$OUTPUT_DMG")"
+# Assemble .app bundle
+mkdir -p TorchRoyale.app/Contents/MacOS
+mkdir -p TorchRoyale.app/Contents/Resources
 
-WORK_DIR="$(mktemp -d /private/tmp/torchroyale-dmg.XXXXXX)"
-STAGING_DIR="$WORK_DIR/staging"
-BACKGROUND_DIR="$STAGING_DIR/.background"
-RESIZED_BACKGROUND="$BACKGROUND_DIR/background.png"
-RW_DMG="$WORK_DIR/TorchRoyale-temp.dmg"
-MOUNT_OUTPUT="$WORK_DIR/mount.txt"
+cat > TorchRoyale.app/Contents/MacOS/TorchRoyale << 'EOF'
+#!/bin/bash
+RESOURCES="$(cd "$(dirname "$0")/../Resources" && pwd)"
+exec "$RESOURCES/python-dist/bin/python3" "$RESOURCES/run_ui.py"
+EOF
+chmod +x TorchRoyale.app/Contents/MacOS/TorchRoyale
 
-cleanup() {
-  if [[ -n "${DEVICE_NAME:-}" ]]; then
-    hdiutil detach "$DEVICE_NAME" -quiet || true
-  fi
-  rm -rf "$WORK_DIR"
-}
-trap cleanup EXIT
-
-mkdir -p "$BACKGROUND_DIR"
-cp -R "$APP_PATH" "$STAGING_DIR/"
-ln -s /Applications "$STAGING_DIR/Applications"
-
-sips -s format png "$BACKGROUND_SOURCE" --resampleHeightWidth "$WINDOW_HEIGHT" "$WINDOW_WIDTH" --out "$RESIZED_BACKGROUND" >/dev/null
-SetFile -a V "$BACKGROUND_DIR"
-
-rm -f "$OUTPUT_DMG"
-
-hdiutil create \
-  -srcfolder "$STAGING_DIR" \
-  -volname "$VOLUME_NAME" \
-  -fs HFS+ \
-  -fsargs "-c c=64,a=16,e=16" \
-  -format UDRW \
-  "$RW_DMG" >/dev/null
-
-hdiutil attach -readwrite -noverify -noautoopen "$RW_DMG" >"$MOUNT_OUTPUT"
-DEVICE_NAME="$(awk '/Apple_HFS/ {print $1}' "$MOUNT_OUTPUT" | head -n 1)"
-VOLUME_PATH="/Volumes/$VOLUME_NAME"
-
-if [[ -z "$DEVICE_NAME" || ! -d "$VOLUME_PATH" ]]; then
-  echo "Failed to mount temporary DMG." >&2
-  exit 1
-fi
-
-osascript <<EOF >/dev/null
-tell application "Finder"
-  tell disk "$VOLUME_NAME"
-    open
-    tell container window
-      set current view to icon view
-      set toolbar visible to false
-      set statusbar visible to false
-      set bounds to {100, 100, 100 + $WINDOW_WIDTH, 100 + $WINDOW_HEIGHT}
-    end tell
-    tell icon view options of container window
-      set icon size to $ICON_SIZE
-      set text size to 14
-      set arrangement to not arranged
-      set background picture to (POSIX file "$VOLUME_PATH/.background/background.png" as alias)
-    end tell
-    set position of item "TorchRoyale.app" to {$APP_ICON_X, $APP_ICON_Y}
-    set position of item "Applications" to {$APPS_ICON_X, $APPS_ICON_Y}
-    close
-    open
-    update without registering applications
-    delay 2
-  end tell
-end tell
+cat > TorchRoyale.app/Contents/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>TorchRoyale</string>
+  <key>CFBundleExecutable</key><string>TorchRoyale</string>
+  <key>CFBundleIdentifier</key><string>com.torchroyale.app</string>
+  <key>CFBundleVersion</key><string>1.0.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+</dict>
+</plist>
 EOF
 
-sync
-hdiutil detach "$DEVICE_NAME" -quiet
-unset DEVICE_NAME
+cp run_ui.py TorchRoyale.app/Contents/Resources/
+cp run_inference.py TorchRoyale.app/Contents/Resources/
+cp -r src TorchRoyale.app/Contents/Resources/
+cp -r data TorchRoyale.app/Contents/Resources/
+cp -r configs TorchRoyale.app/Contents/Resources/
+cp *.pt TorchRoyale.app/Contents/Resources/ 2>/dev/null || true
+cp -r python TorchRoyale.app/Contents/Resources/python-dist
 
-hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$OUTPUT_DMG" >/dev/null
+echo "TorchRoyale.app assembled."
 
-echo "Created DMG at $OUTPUT_DMG"
+# Optionally wrap in DMG
+if command -v create-dmg &> /dev/null; then
+    mkdir dmg-stage
+    cp -r TorchRoyale.app dmg-stage/TorchRoyale.app
+    create-dmg \
+        --volname "TorchRoyale" \
+        --window-size 800 400 \
+        --icon-size 128 \
+        --icon "TorchRoyale.app" 200 200 \
+        --app-drop-link 600 200 \
+        "TorchRoyale-macOS.dmg" \
+        dmg-stage
+    echo "TorchRoyale-macOS.dmg created."
+else
+    echo "create-dmg not found — skipping DMG. Install with: brew install create-dmg"
+fi
+
+echo "Done. To install: cp -r TorchRoyale.app /Applications/TorchRoyale.app"
